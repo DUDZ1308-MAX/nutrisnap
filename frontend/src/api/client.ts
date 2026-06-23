@@ -1,7 +1,8 @@
 import axios from 'axios'
 import type { Meal, VisionResult, DailySummary, WeeklySummary, Goal, Workout, DailyReport, Exercise, WorkoutExercise, WorkoutDetail } from '../types/meal'
 
-const baseURL = import.meta.env.VITE_API_URL || '/api'
+const rawURL = import.meta.env.VITE_API_URL || ''
+const baseURL = rawURL ? `${rawURL.replace(/\/+$/, '')}/api` : '/api'
 const api = axios.create({ baseURL })
 
 export async function fetchMeals(date?: string): Promise<Meal[]> {
