@@ -10,7 +10,7 @@ services:
       - key: GEMINI_API_KEY
         sync: false
       - key: DATABASE_URL
-        value: postgresql://user:pass@ep-xxxx.us-east-2.aws.neon.tech/nutrisnap
+        sync: false
       - key: CORS_ORIGINS
         fromService:
           name: nutrisnap-ui
