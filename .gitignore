@@ -1,0 +1,9 @@
+backend/.env
+backend/uploads/*
+!backend/uploads/.gitkeep
+backend/nutrisnap.db
+frontend/dist
+frontend/node_modules
+__pycache__
+*.pyc
+.DS_Store

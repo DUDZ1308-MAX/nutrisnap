@@ -1,0 +1,31 @@
+services:
+  - type: web
+    name: nutrisnap-api
+    runtime: python
+    plan: free
+    buildCommand: pip install -r backend/requirements.txt
+    startCommand: cd backend && uvicorn main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/health
+    envVars:
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: DATABASE_URL
+        value: postgresql://user:pass@ep-xxxx.us-east-2.aws.neon.tech/nutrisnap
+      - key: CORS_ORIGINS
+        fromService:
+          name: nutrisnap-ui
+          type: static
+          property: host
+
+  - type: static
+    name: nutrisnap-ui
+    runtime: static
+    plan: free
+    buildCommand: cd frontend && npm install && npm run build
+    staticPublishPath: ./frontend/dist
+    envVars:
+      - key: VITE_API_URL
+        fromService:
+          name: nutrisnap-api
+          type: web
+          property: host
