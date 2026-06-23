@@ -15,39 +15,39 @@ const typeColors: Record<string, string> = {
 
 export default function MealCard({ meal, onEdit, onDelete }: Props) {
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4 flex items-start gap-4">
+    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-3 sm:p-4 flex items-start gap-3 sm:gap-4">
       {meal.image_path && (
         <img
           src={`/uploads/${meal.image_path.split('/').pop()}`}
           alt={meal.name}
-          className="w-16 h-16 rounded-lg object-cover flex-shrink-0"
+          className="w-12 h-12 sm:w-16 sm:h-16 rounded-lg object-cover flex-shrink-0"
         />
       )}
       <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 mb-1">
-          <h4 className="font-semibold truncate">{meal.name}</h4>
-          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${typeColors[meal.meal_type] || typeColors.snack}`}>
+        <div className="flex items-center gap-1.5 sm:gap-2 mb-1 flex-wrap">
+          <h4 className="font-semibold text-sm sm:text-base truncate">{meal.name}</h4>
+          <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${typeColors[meal.meal_type] || typeColors.snack}`}>
             {meal.meal_type}
           </span>
           {meal.ai_generated && (
             <span className="text-xs text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 px-1.5 py-0.5 rounded">AI</span>
           )}
         </div>
-        <div className="flex gap-4 text-sm text-gray-600 dark:text-gray-300">
-          <span>{Math.round(meal.calories)} cal</span>
+        <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs sm:text-sm text-gray-600 dark:text-gray-300">
+          <span className="font-medium text-emerald-600">{Math.round(meal.calories)} cal</span>
           {meal.protein != null && <span>P: {Math.round(meal.protein)}g</span>}
           {meal.carbs != null && <span>C: {Math.round(meal.carbs)}g</span>}
           {meal.fat != null && <span>F: {Math.round(meal.fat)}g</span>}
         </div>
       </div>
-      <div className="flex gap-1 flex-shrink-0">
+      <div className="flex gap-1 flex-shrink-0 self-start">
         {onEdit && (
-          <button onClick={() => onEdit(meal)} className="text-sm text-gray-500 dark:text-gray-400 hover:text-emerald-600 dark:hover:text-emerald-400 px-2 py-1">
+          <button onClick={() => onEdit(meal)} className="text-sm text-gray-500 dark:text-gray-400 hover:text-emerald-600 dark:hover:text-emerald-400 px-1.5 py-1">
             ✏️
           </button>
         )}
         {onDelete && (
-          <button onClick={() => onDelete(meal.id)} className="text-sm text-gray-500 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 px-2 py-1">
+          <button onClick={() => onDelete(meal.id)} className="text-sm text-gray-500 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 px-1.5 py-1">
             🗑️
           </button>
         )}

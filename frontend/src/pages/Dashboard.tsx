@@ -35,12 +35,12 @@ export default function Dashboard() {
   if (loading) return <div className="text-center py-12 text-gray-400 dark:text-gray-500">Loading...</div>
 
   return (
-    <div className="space-y-6">
+      <div className="space-y-4 sm:space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Dashboard</h1>
+        <h1 className="text-xl sm:text-2xl font-bold">Dashboard</h1>
         <Link
           to="/log"
-          className="bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-emerald-700 transition-colors"
+          className="bg-emerald-600 text-white px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg text-xs sm:text-sm font-medium hover:bg-emerald-700 transition-colors"
         >
           + Log Meal
         </Link>
@@ -48,22 +48,22 @@ export default function Dashboard() {
 
       {daily && <CalorieProgress current={daily.total_calories} goal={daily.goal} />}
 
-      <div className="grid grid-cols-3 gap-4">
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4 text-center">
-          <div className="text-2xl font-bold text-emerald-600">{daily?.meal_count ?? 0}</div>
-          <div className="text-sm text-gray-500 dark:text-gray-400">Meals</div>
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-3 sm:p-4 text-center">
+          <div className="text-xl sm:text-2xl font-bold text-emerald-600">{daily?.meal_count ?? 0}</div>
+          <div className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">Meals</div>
         </div>
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4 text-center">
-          <div className="text-2xl font-bold text-emerald-600">
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-3 sm:p-4 text-center">
+          <div className="text-xl sm:text-2xl font-bold text-emerald-600">
             {daily?.total_protein != null ? `${Math.round(daily.total_protein)}g` : '-'}
           </div>
-          <div className="text-sm text-gray-500 dark:text-gray-400">Protein</div>
+          <div className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">Protein</div>
         </div>
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4 text-center">
-          <div className="text-2xl font-bold text-emerald-600">
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-3 sm:p-4 text-center">
+          <div className="text-xl sm:text-2xl font-bold text-emerald-600">
             {daily?.total_carbs != null ? `${Math.round(daily.total_carbs)}g` : '-'}
           </div>
-          <div className="text-sm text-gray-500 dark:text-gray-400">Carbs</div>
+          <div className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">Carbs</div>
         </div>
       </div>
 

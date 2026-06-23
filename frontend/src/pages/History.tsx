@@ -34,14 +34,14 @@ export default function History() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Meal History</h1>
+    <div className="space-y-4 sm:space-y-6">
+      <div className="flex items-center justify-between gap-2">
+        <h1 className="text-xl sm:text-2xl font-bold">Meal History</h1>
         <input
           type="date"
           value={date}
           onChange={(e) => setDate(e.target.value)}
-          className="border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+          className="border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 rounded-lg px-2 py-1.5 sm:px-3 sm:py-2 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
         />
       </div>
 
@@ -58,8 +58,8 @@ export default function History() {
       )}
 
       {editing && (
-        <div className="fixed inset-0 bg-black/40 dark:bg-black/60 flex items-center justify-center z-50">
-          <form onSubmit={handleSaveEdit} className="bg-white dark:bg-gray-800 rounded-xl shadow-xl dark:shadow-2xl p-6 w-full max-w-md mx-4 space-y-4">
+        <div className="fixed inset-0 bg-black/40 dark:bg-black/60 flex items-end sm:items-center justify-center z-50">
+          <form onSubmit={handleSaveEdit} className="bg-white dark:bg-gray-800 rounded-t-2xl sm:rounded-xl shadow-xl dark:shadow-2xl p-4 sm:p-6 w-full sm:max-w-md sm:mx-4 space-y-3 sm:space-y-4">
             <h2 className="text-lg font-semibold dark:text-gray-100">Edit Meal</h2>
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Name</label>
@@ -69,7 +69,7 @@ export default function History() {
                 className="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-500"
               />
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Calories</label>
                 <input

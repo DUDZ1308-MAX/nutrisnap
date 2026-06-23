@@ -120,34 +120,34 @@ export default function Progress() {
   const burnPct = report && report.total_calories_burned > 0 ? Math.min((report.total_calories_burned / report.total_calories_consumed) * 100, 100) : 0
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Daily Progress Report</h1>
+    <div className="space-y-4 sm:space-y-6">
+      <div className="flex items-center justify-between gap-2">
+        <h1 className="text-xl sm:text-2xl font-bold">Daily Progress</h1>
         <input
           type="date"
           value={date}
           onChange={(e) => setDate(e.target.value)}
-          className="border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+          className="border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 rounded-lg px-2 py-1.5 sm:px-3 sm:py-2 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
         />
       </div>
 
       {report && (
         <>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4 text-center">
-              <div className="text-2xl font-bold text-emerald-600">{Math.round(report.total_calories_consumed)}</div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-3 sm:p-4 text-center">
+              <div className="text-lg sm:text-2xl font-bold text-emerald-600">{Math.round(report.total_calories_consumed)}</div>
               <div className="text-xs text-gray-500 dark:text-gray-400">Calories In</div>
             </div>
-            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4 text-center">
-              <div className="text-2xl font-bold text-red-500">{Math.round(report.total_calories_burned)}</div>
+            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-3 sm:p-4 text-center">
+              <div className="text-lg sm:text-2xl font-bold text-red-500">{Math.round(report.total_calories_burned)}</div>
               <div className="text-xs text-gray-500 dark:text-gray-400">Calories Out</div>
             </div>
-            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4 text-center">
-              <div className="text-2xl font-bold text-blue-500">{Math.round(report.net_calories)}</div>
+            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-3 sm:p-4 text-center">
+              <div className="text-lg sm:text-2xl font-bold text-blue-500">{Math.round(report.net_calories)}</div>
               <div className="text-xs text-gray-500 dark:text-gray-400">Net Calories</div>
             </div>
-            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4 text-center">
-              <div className="text-2xl font-bold text-yellow-500">{Math.round(report.calories_remaining)}</div>
+            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-3 sm:p-4 text-center">
+              <div className="text-lg sm:text-2xl font-bold text-yellow-500">{Math.round(report.calories_remaining)}</div>
               <div className="text-xs text-gray-500 dark:text-gray-400">Remaining</div>
             </div>
           </div>
@@ -223,8 +223,8 @@ export default function Progress() {
         </div>
 
         {showForm && (
-          <form onSubmit={handleAddWorkout} className="mb-4 p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg space-y-3">
-            <div className="grid grid-cols-2 gap-3">
+          <form onSubmit={handleAddWorkout} className="mb-4 p-3 sm:p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg space-y-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
               <div>
                 <label className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">Workout Name</label>
                 <input value={wName} onChange={(e) => setWName(e.target.value)} required

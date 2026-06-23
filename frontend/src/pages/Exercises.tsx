@@ -27,8 +27,8 @@ export default function Exercises() {
   }, [activeGroup, search])
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-bold">Exercise Library</h1>
+    <div className="space-y-4 sm:space-y-6">
+      <h1 className="text-xl sm:text-2xl font-bold">Exercise Library</h1>
 
       <div className="flex flex-wrap gap-2">
         <button
