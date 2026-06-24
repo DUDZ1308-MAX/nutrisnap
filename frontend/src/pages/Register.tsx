@@ -18,8 +18,9 @@ export default function Register() {
     try {
       await register(name, email, password)
       navigate('/', { replace: true })
-    } catch {
-      setError('Registration failed. Email may already be in use.')
+    } catch (err: any) {
+      const msg = err?.response?.data?.detail
+      setError(msg || 'Registration failed. Please try again.')
     } finally {
       setBusy(false)
     }

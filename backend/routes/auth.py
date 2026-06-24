@@ -16,17 +16,21 @@ def register(payload: UserCreate, db: Session = Depends(get_db)):
     if existing:
         raise HTTPException(status_code=409, detail="Email already registered")
 
-    user = User(
-        email=payload.email,
-        password_hash=hash_password(payload.password),
-        name=payload.name,
-    )
-    db.add(user)
-    db.flush()
+    try:
+        user = User(
+            email=payload.email,
+            password_hash=hash_password(payload.password),
+            name=payload.name,
+        )
+        db.add(user)
+        db.flush()
 
-    db.add(CalorieGoal(user_id=user.id, daily_goal=2000))
-    db.commit()
-    db.refresh(user)
+        db.add(CalorieGoal(user_id=user.id, daily_goal=2000))
+        db.commit()
+        db.refresh(user)
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=f"Registration failed: {str(e)}")
 
     token = create_access_token({"sub": user.email})
     return TokenResponse(
