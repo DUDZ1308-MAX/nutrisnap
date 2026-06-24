@@ -9,6 +9,46 @@ from routes import meals, vision, summary, goals, workouts, exercises, auth
 
 Base.metadata.create_all(bind=engine)
 
+def run_migrations():
+    """Ensure schema is up to date on PostgreSQL (Neon)."""
+    from config import DATABASE_URL
+    is_pg = DATABASE_URL.startswith("postgresql") or DATABASE_URL.startswith("postgres")
+    if not is_pg:
+        return
+    try:
+        from models import Meal, Workout, CalorieGoal, User, Exercise
+        from sqlalchemy import inspect, text
+
+        inspector = inspect(engine)
+        existing_tables = set(inspector.get_table_names())
+
+        # Tables that need the new user_id column
+        if "users" not in existing_tables:
+            User.__table__.create(engine)
+
+        if "calorie_goals" in existing_tables:
+            cols = {c["name"] for c in inspector.get_columns("calorie_goals")}
+            if "user_id" not in cols:
+                CalorieGoal.__table__.drop(engine)
+                CalorieGoal.__table__.create(engine)
+
+        if "meals" in existing_tables:
+            cols = {c["name"] for c in inspector.get_columns("meals")}
+            if "user_id" not in cols:
+                Meal.__table__.drop(engine)
+                Meal.__table__.create(engine)
+
+        if "workouts" in existing_tables:
+            cols = {c["name"] for c in inspector.get_columns("workouts")}
+            if "user_id" not in cols:
+                Workout.__table__.drop(engine)
+                Workout.__table__.create(engine)
+    except Exception as e:
+        print(f"Migration warning: {e}")
+
+
+run_migrations()
+
 app = FastAPI(title="NutriSnap API", version="1.0.0")
 
 origins = os.getenv("CORS_ORIGINS", "http://localhost:5173,http://localhost:3000").split(",")
