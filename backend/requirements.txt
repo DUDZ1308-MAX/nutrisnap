@@ -8,5 +8,4 @@ pydantic
 httpx
 psycopg2-binary
 pyjwt
-passlib[bcrypt]
-bcrypt<5.0.0
+bcrypt
