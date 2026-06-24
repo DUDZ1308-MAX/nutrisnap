@@ -1,0 +1,72 @@
+import { useState, type FormEvent } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
+import { resetPassword } from '../api/client'
+
+export default function ResetPassword() {
+  const navigate = useNavigate()
+  const [token, setToken] = useState('')
+  const [password, setPassword] = useState('')
+  const [message, setMessage] = useState('')
+  const [error, setError] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault()
+    setError('')
+    setMessage('')
+    setBusy(true)
+    try {
+      const res = await resetPassword(token, password)
+      setMessage(res.message)
+      setTimeout(() => navigate('/login', { replace: true }), 2000)
+    } catch {
+      setError('Invalid or expired reset token.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="flex items-center justify-center min-h-[70vh]">
+      <div className="w-full max-w-sm bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+        <h1 className="text-xl font-bold text-center mb-6">Enter New Password</h1>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Reset Token</label>
+            <input
+              type="text"
+              required
+              value={token}
+              onChange={e => setToken(e.target.value)}
+              placeholder="Paste your reset token here"
+              className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">New Password</label>
+            <input
+              type="password"
+              required
+              minLength={6}
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+            />
+          </div>
+          {error && <p className="text-red-500 text-sm">{error}</p>}
+          {message && <p className="text-emerald-600 dark:text-emerald-400 text-sm">{message}</p>}
+          <button
+            type="submit"
+            disabled={busy}
+            className="w-full bg-emerald-600 text-white py-2 rounded-lg font-medium hover:bg-emerald-700 disabled:opacity-50 transition-colors"
+          >
+            {busy ? 'Resetting...' : 'Reset Password'}
+          </button>
+        </form>
+        <div className="mt-4 text-center text-sm text-gray-500">
+          <Link to="/login" className="text-emerald-600 font-medium hover:underline">Back to Sign In</Link>
+        </div>
+      </div>
+    </div>
+  )
+}

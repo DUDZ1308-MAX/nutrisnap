@@ -7,3 +7,5 @@ Pillow
 pydantic
 httpx
 psycopg2-binary
+pyjwt
+passlib[bcrypt]

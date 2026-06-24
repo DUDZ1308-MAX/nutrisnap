@@ -51,6 +51,13 @@ export interface Workout {
   created_at: string
 }
 
+export interface WorkoutExerciseInput {
+  exercise_id: number
+  sort_order: number
+  sets_data: string
+  notes?: string | null
+}
+
 export interface Exercise {
   id: number
   name: string

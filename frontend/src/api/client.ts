@@ -1,9 +1,17 @@
 import axios from 'axios'
-import type { Meal, VisionResult, DailySummary, WeeklySummary, Goal, Workout, DailyReport, Exercise, WorkoutExercise, WorkoutDetail } from '../types/meal'
+import type { Meal, VisionResult, DailySummary, WeeklySummary, Goal, Workout, DailyReport, Exercise, WorkoutDetail, WorkoutExerciseInput } from '../types/meal'
 
 const rawURL = import.meta.env.VITE_API_URL || ''
 const baseURL = rawURL ? `${rawURL.replace(/\/+$/, '')}/api` : '/api'
 const api = axios.create({ baseURL })
+
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem('nutrisnap-token')
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`
+  }
+  return config
+})
 
 export async function fetchMeals(date?: string): Promise<Meal[]> {
   const params = date ? { date } : {}
@@ -60,7 +68,7 @@ export async function fetchWorkouts(date?: string): Promise<Workout[]> {
   return res.data
 }
 
-export async function createWorkout(data: Partial<Workout>): Promise<Workout> {
+export async function createWorkout(data: Partial<Workout> & { exercises?: WorkoutExerciseInput[] }): Promise<Workout> {
   const res = await api.post('/workouts', data)
   return res.data
 }
@@ -100,5 +108,15 @@ export async function fetchWorkoutDetail(id: number): Promise<WorkoutDetail> {
 
 export async function fetchExercise(id: number): Promise<Exercise> {
   const res = await api.get(`/exercises/${id}`)
+  return res.data
+}
+
+export async function forgotPassword(email: string): Promise<{ message: string; reset_token?: string }> {
+  const res = await axios.post(`${baseURL}/auth/forgot-password`, { email })
+  return res.data
+}
+
+export async function resetPassword(token: string, new_password: string): Promise<{ message: string }> {
+  const res = await axios.post(`${baseURL}/auth/reset-password`, { token, new_password })
   return res.data
 }

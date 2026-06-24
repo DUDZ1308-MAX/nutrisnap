@@ -5,7 +5,7 @@ from fastapi.staticfiles import StaticFiles
 
 from database import engine, Base, get_db
 from models import CalorieGoal, Exercise
-from routes import meals, vision, summary, goals, workouts, exercises
+from routes import meals, vision, summary, goals, workouts, exercises, auth
 
 Base.metadata.create_all(bind=engine)
 
@@ -23,6 +23,7 @@ app.add_middleware(
 from config import UPLOAD_DIR
 app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
 
+app.include_router(auth.router, prefix="/api")
 app.include_router(meals.router, prefix="/api")
 app.include_router(vision.router, prefix="/api")
 app.include_router(summary.router, prefix="/api")
@@ -100,9 +101,6 @@ SEED_EXERCISES = [
 @app.on_event("startup")
 def startup():
     db = next(get_db())
-    if not db.query(CalorieGoal).first():
-        db.add(CalorieGoal(daily_goal=2000))
-        db.commit()
     if not db.query(Exercise).first():
         for name, group, equip, instr in SEED_EXERCISES:
             db.add(Exercise(name=name, muscle_group=group, equipment=equip, instructions=instr))

@@ -1,75 +1,132 @@
+from datetime import date
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from database import get_db
-from models import Workout, WorkoutExercise
-from schemas import WorkoutCreate, WorkoutUpdate, WorkoutResponse, WorkoutDetailResponse, WorkoutExerciseCreate
+from models import Workout, WorkoutExercise, User
+from schemas import WorkoutCreate, WorkoutUpdate, WorkoutDetailResponse
+from auth import get_current_user
 
 router = APIRouter(prefix="/workouts", tags=["Workouts"])
 
 
-@router.get("", response_model=list[WorkoutResponse])
-def list_workouts(query_date: str | None = None, db: Session = Depends(get_db)):
-    from datetime import date
-    q = db.query(Workout)
+@router.get("", response_model=list[WorkoutDetailResponse])
+def list_workouts(
+    query_date: date | None = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    q = (
+        db.query(Workout)
+        .options(joinedload(Workout.exercises).joinedload(WorkoutExercise.exercise))
+        .filter(Workout.user_id == current_user.id)
+    )
     if query_date:
-        q = q.filter(Workout.date == date.fromisoformat(query_date))
+        q = q.filter(Workout.date == query_date)
     return q.order_by(Workout.id.desc()).all()
 
 
 @router.post("", response_model=WorkoutDetailResponse, status_code=201)
-def create_workout(payload: WorkoutCreate, db: Session = Depends(get_db)):
-    exercises_data = payload.exercises
-    workout = Workout(**payload.model_dump(exclude={"exercises"}))
+def create_workout(
+    payload: WorkoutCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    workout = Workout(
+        user_id=current_user.id,
+        name=payload.name,
+        exercise_type=payload.exercise_type,
+        duration_minutes=payload.duration_minutes,
+        calories_burned=payload.calories_burned,
+        date=payload.date,
+        target_muscles=payload.target_muscles,
+        notes=payload.notes,
+    )
     db.add(workout)
-    db.commit()
-    db.refresh(workout)
+    db.flush()
 
-    for ex_data in exercises_data:
-        we = WorkoutExercise(workout_id=workout.id, **ex_data.model_dump())
+    for ex in payload.exercises:
+        we = WorkoutExercise(
+            workout_id=workout.id,
+            exercise_id=ex.exercise_id,
+            sort_order=ex.sort_order,
+            sets_data=ex.sets_data,
+            notes=ex.notes,
+        )
         db.add(we)
-    if exercises_data:
-        db.commit()
-        db.refresh(workout)
 
-    return workout
-
-
-@router.get("/{workout_id}", response_model=WorkoutResponse)
-def get_workout(workout_id: int, db: Session = Depends(get_db)):
-    workout = db.query(Workout).filter(Workout.id == workout_id).first()
-    if not workout:
-        raise HTTPException(404, "Workout not found")
-    return workout
-
-
-@router.get("/{workout_id}/detail", response_model=WorkoutDetailResponse)
-def get_workout_detail(workout_id: int, db: Session = Depends(get_db)):
-    workout = db.query(Workout).filter(Workout.id == workout_id).first()
-    if not workout:
-        raise HTTPException(404, "Workout not found")
-    return workout
-
-
-@router.put("/{workout_id}", response_model=WorkoutResponse)
-def update_workout(workout_id: int, payload: WorkoutUpdate, db: Session = Depends(get_db)):
-    workout = db.query(Workout).filter(Workout.id == workout_id).first()
-    if not workout:
-        raise HTTPException(404, "Workout not found")
-    for key, val in payload.model_dump(exclude={"exercises"}, exclude_unset=True).items():
-        setattr(workout, key, val)
-    if payload.exercises is not None:
-        db.query(WorkoutExercise).filter(WorkoutExercise.workout_id == workout_id).delete()
-        for ex_data in payload.exercises:
-            we = WorkoutExercise(workout_id=workout.id, **ex_data.model_dump())
-            db.add(we)
     db.commit()
     db.refresh(workout)
+    return (
+        db.query(Workout)
+        .options(joinedload(Workout.exercises).joinedload(WorkoutExercise.exercise))
+        .filter(Workout.id == workout.id)
+        .first()
+    )
+
+
+@router.get("/{workout_id}", response_model=WorkoutDetailResponse)
+def get_workout(
+    workout_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    workout = (
+        db.query(Workout)
+        .options(joinedload(Workout.exercises).joinedload(WorkoutExercise.exercise))
+        .filter(Workout.id == workout_id, Workout.user_id == current_user.id)
+        .first()
+    )
+    if not workout:
+        raise HTTPException(404, "Workout not found")
     return workout
+
+
+@router.put("/{workout_id}", response_model=WorkoutDetailResponse)
+def update_workout(
+    workout_id: int,
+    payload: WorkoutUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    workout = db.query(Workout).filter(Workout.id == workout_id, Workout.user_id == current_user.id).first()
+    if not workout:
+        raise HTTPException(404, "Workout not found")
+
+    data = payload.model_dump(exclude_unset=True, exclude={"exercises"})
+    if "date" in data and isinstance(data["date"], str):
+        data["date"] = date.fromisoformat(data["date"])
+    for key, val in data.items():
+        setattr(workout, key, val)
+
+    if payload.exercises is not None:
+        db.query(WorkoutExercise).filter(WorkoutExercise.workout_id == workout.id).delete()
+        for i, ex in enumerate(payload.exercises):
+            we = WorkoutExercise(
+                workout_id=workout.id,
+                exercise_id=ex.exercise_id,
+                sort_order=ex.sort_order,
+                sets_data=ex.sets_data,
+                notes=ex.notes,
+            )
+            db.add(we)
+
+    db.commit()
+    db.refresh(workout)
+    return (
+        db.query(Workout)
+        .options(joinedload(Workout.exercises).joinedload(WorkoutExercise.exercise))
+        .filter(Workout.id == workout.id)
+        .first()
+    )
 
 
 @router.delete("/{workout_id}", status_code=204)
-def delete_workout(workout_id: int, db: Session = Depends(get_db)):
-    workout = db.query(Workout).filter(Workout.id == workout_id).first()
+def delete_workout(
+    workout_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    workout = db.query(Workout).filter(Workout.id == workout_id, Workout.user_id == current_user.id).first()
     if not workout:
         raise HTTPException(404, "Workout not found")
     db.delete(workout)
