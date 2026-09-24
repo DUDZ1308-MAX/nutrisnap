@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "NutriSnap"
+description = "A friendly nutrition and workout tracker that helps people log meals, estimate calories from a meal photo, track daily nutrition goals, and record workouts."
+version = "1.0.0"
+id = "artifacts/nutrisnap"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 26270
+
+[services.development]
+run = "pnpm --filter @workspace/nutrisnap run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/nutrisnap", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/nutrisnap/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "26270"
+BASE_PATH = "/"
