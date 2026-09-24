@@ -1,7 +1,8 @@
 import { Camera, Check, ImagePlus, X } from 'lucide-react';
 import { useEffect, useState, type ChangeEvent, type FormEvent, type ReactNode } from 'react';
 import type { Meal, MealType, Workout } from '@/lib/nutrisnap-storage';
-import { todayKey } from '@/lib/nutrisnap-storage';
+import { todayKey, workoutTargetAreas, type WorkoutTarget } from '@/lib/nutrisnap-storage';
+import { MuscleMap } from '@/components/muscle-map';
 
 type ModalProps = { title: string; eyebrow: string; onClose: () => void; children: ReactNode };
 
@@ -138,10 +139,17 @@ export function WorkoutDialog({ workout, onClose, onSave }: WorkoutFormProps) {
     date: workout?.date ?? todayKey(),
     durationMinutes: workout?.durationMinutes ?? 30,
     caloriesBurned: workout?.caloriesBurned ?? 0,
+    targetAreas: workout?.targetAreas ?? [],
     notes: workout?.notes ?? '',
   });
   const [error, setError] = useState('');
   const set = (key: keyof typeof form, value: string | number) => setForm((current) => ({ ...current, [key]: value }));
+  const toggleTargetArea = (target: WorkoutTarget) => setForm((current) => ({
+    ...current,
+    targetAreas: current.targetAreas.includes(target)
+      ? current.targetAreas.filter((area) => area !== target)
+      : [...current.targetAreas, target],
+  }));
   const submit = (event: FormEvent) => {
     event.preventDefault();
     if (!form.name.trim()) { setError('Give this workout a name first.'); return; }
@@ -157,6 +165,31 @@ export function WorkoutDialog({ workout, onClose, onSave }: WorkoutFormProps) {
           <Field label="Date"><input type="date" value={form.date} onChange={(event) => set('date', event.target.value)} className={inputClass} data-testid="input-workout-date" /></Field>
           <Field label="Duration · min"><input type="number" min="0" value={form.durationMinutes} onChange={(event) => set('durationMinutes', Number(event.target.value))} className={inputClass} data-testid="input-workout-duration" /></Field>
           <Field label="Calories burned"><input type="number" min="0" value={form.caloriesBurned} onChange={(event) => set('caloriesBurned', Number(event.target.value))} className={inputClass} data-testid="input-workout-calories" /></Field>
+          <Field label="Target areas" wide>
+            <div className="grid gap-3 rounded-2xl border border-border bg-muted/35 p-3 sm:grid-cols-[150px_minmax(0,1fr)] sm:items-center sm:p-4">
+              <MuscleMap targets={form.targetAreas} compact />
+              <div>
+                <p className="mb-2 text-xs leading-relaxed text-muted-foreground">Choose the areas this session focused on.</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {workoutTargetAreas.map((target) => {
+                    const selected = form.targetAreas.includes(target.id);
+                    return (
+                      <button
+                        key={target.id}
+                        type="button"
+                        aria-pressed={selected}
+                        onClick={() => toggleTargetArea(target.id)}
+                        data-testid={`button-toggle-target-${target.id}`}
+                        className={`focus-ring rounded-xl border px-2.5 py-2 text-left text-xs font-bold transition ${selected ? 'border-primary bg-primary text-primary-foreground' : 'border-border bg-card text-muted-foreground hover:border-primary/50 hover:text-foreground'}`}
+                      >
+                        {target.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          </Field>
           <Field label="Notes" wide><textarea value={form.notes} onChange={(event) => set('notes', event.target.value)} placeholder="How did it feel?" rows={3} className={`${inputClass} h-auto py-3`} data-testid="input-workout-notes" /></Field>
         </div>
         {error ? <p className="text-sm font-semibold text-destructive" role="alert" data-testid="status-workout-form-error">{error}</p> : null}

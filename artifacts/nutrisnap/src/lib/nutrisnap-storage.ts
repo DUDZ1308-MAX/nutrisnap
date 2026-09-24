@@ -15,6 +15,21 @@ export type Meal = {
   imageDataUrl?: string;
 };
 
+export const workoutTargetAreas = [
+  { id: 'chest', label: 'Chest' },
+  { id: 'shoulders', label: 'Shoulders' },
+  { id: 'biceps', label: 'Biceps' },
+  { id: 'triceps', label: 'Triceps' },
+  { id: 'back', label: 'Upper back' },
+  { id: 'core', label: 'Core' },
+  { id: 'glutes', label: 'Glutes' },
+  { id: 'quads', label: 'Quads' },
+  { id: 'hamstrings', label: 'Hamstrings' },
+  { id: 'calves', label: 'Calves' },
+] as const;
+
+export type WorkoutTarget = typeof workoutTargetAreas[number]['id'];
+
 export type Workout = {
   id: string;
   name: string;
@@ -22,6 +37,7 @@ export type Workout = {
   date: string;
   durationMinutes: number;
   caloriesBurned: number;
+  targetAreas: WorkoutTarget[];
   notes?: string;
 };
 
@@ -77,7 +93,13 @@ export function useNutriSnap() {
 
   useEffect(() => {
     setMeals(readStorage<Meal[]>(STORAGE_KEYS.meals, []));
-    setWorkouts(readStorage<Workout[]>(STORAGE_KEYS.workouts, []));
+    const storedWorkouts = readStorage<Workout[]>(STORAGE_KEYS.workouts, []);
+    const normalizedWorkouts = storedWorkouts.map((workout) => ({
+      ...workout,
+      targetAreas: Array.isArray(workout.targetAreas) ? workout.targetAreas : [],
+    }));
+    setWorkouts(normalizedWorkouts);
+    writeStorage(STORAGE_KEYS.workouts, normalizedWorkouts);
     setGoals(readStorage<Goals>(STORAGE_KEYS.goals, defaultGoals));
     setReady(true);
   }, []);
