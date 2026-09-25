@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f172a"/>
+      <stop offset="100%" stop-color="#1e293b"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#34d399"/>
+      <stop offset="100%" stop-color="#10b981"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="630" fill="url(#bg)"/>
+  <!-- Decorative circles -->
+  <circle cx="950" cy="120" r="200" fill="#34d399" opacity="0.08"/>
+  <circle cx="1050" cy="500" r="150" fill="#34d399" opacity="0.05"/>
+  <circle cx="100" cy="550" r="180" fill="#10b981" opacity="0.06"/>
+  <!-- App icon -->
+  <rect x="80" y="180" width="100" height="100" rx="24" fill="url(#accent)"/>
+  <text x="130" y="245" font-family="system-ui, -apple-system, sans-serif" font-size="48" font-weight="bold" fill="white" text-anchor="middle">N</text>
+  <!-- Title -->
+  <text x="80" y="340" font-family="system-ui, -apple-system, sans-serif" font-size="64" font-weight="bold" fill="white">NutriSnap</text>
+  <!-- Subtitle -->
+  <text x="80" y="400" font-family="system-ui, -apple-system, sans-serif" font-size="28" fill="#94a3b8">Personal Nutrition &amp; Workout Tracker</text>
+  <!-- Feature pills -->
+  <rect x="80" y="440" width="180" height="40" rx="20" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+  <text x="170" y="466" font-family="system-ui, -apple-system, sans-serif" font-size="16" font-weight="600" fill="#34d399" text-anchor="middle">Meal Logging</text>
+  <rect x="280" y="440" width="180" height="40" rx="20" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+  <text x="370" y="466" font-family="system-ui, -apple-system, sans-serif" font-size="16" font-weight="600" fill="#34d399" text-anchor="middle">Workout Tracking</text>
+  <rect x="480" y="440" width="200" height="40" rx="20" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+  <text x="580" y="466" font-family="system-ui, -apple-system, sans-serif" font-size="16" font-weight="600" fill="#34d399" text-anchor="middle">Nutrition Goals</text>
+  <!-- Bottom tagline -->
+  <text x="80" y="560" font-family="system-ui, -apple-system, sans-serif" font-size="20" fill="#64748b">Simple. Private. Stored on your device.</text>
+</svg>

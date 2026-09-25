@@ -1,5 +1,5 @@
 import { Camera, Check, ImagePlus, X } from 'lucide-react';
-import { useEffect, useState, type ChangeEvent, type FormEvent, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ChangeEvent, type FormEvent, type ReactNode } from 'react';
 import type { Meal, MealType, Workout } from '@/lib/nutrisnap-storage';
 import { todayKey, workoutTargetAreas, type WorkoutTarget } from '@/lib/nutrisnap-storage';
 import { MuscleMap } from '@/components/muscle-map';
@@ -7,8 +7,42 @@ import { MuscleMap } from '@/components/muscle-map';
 type ModalProps = { title: string; eyebrow: string; onClose: () => void; children: ReactNode };
 
 function Modal({ title, eyebrow, onClose, children }: ModalProps) {
+  const overlayRef = useRef<HTMLDivElement>(null);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
+  useEffect(() => {
+    const previous = document.activeElement as HTMLElement | null;
+    const overlay = overlayRef.current;
+    if (!overlay) return;
+
+    const focusable = overlay.querySelectorAll<HTMLElement>(
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+    );
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') { onCloseRef.current(); return; }
+      if (e.key !== 'Tab') return;
+      if (e.shiftKey) {
+        if (document.activeElement === first) { e.preventDefault(); last?.focus(); }
+      } else {
+        if (document.activeElement === last) { e.preventDefault(); first?.focus(); }
+      }
+    }
+
+    overlay.addEventListener('keydown', handleKeyDown);
+    first?.focus();
+
+    return () => {
+      overlay.removeEventListener('keydown', handleKeyDown);
+      previous?.focus();
+    };
+  }, []);
+
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-foreground/35 p-4 backdrop-blur-[3px]" role="dialog" aria-modal="true">
+    <div ref={overlayRef} className="fixed inset-0 z-50 grid place-items-center bg-foreground/35 p-4 backdrop-blur-[3px]" role="dialog" aria-modal="true" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="max-h-[92dvh] w-full max-w-[620px] overflow-y-auto rounded-[26px] border border-border bg-card p-5 shadow-2xl sm:p-7">
         <div className="mb-6 flex items-start justify-between gap-4">
           <div>
@@ -89,7 +123,7 @@ export function MealDialog({ meal, onClose, onSave }: MealFormProps) {
     <Modal title={meal ? 'Edit meal' : 'Add a meal'} eyebrow="Manual nutrition log" onClose={onClose}>
       <form onSubmit={submit} className="space-y-5">
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Meal name" wide><input required autoFocus value={form.name} onChange={(event) => set('name', event.target.value)} placeholder="e.g. Lemon ricotta toast" className={inputClass} data-testid="input-meal-name" /></Field>
+          <Field label="Meal name" wide><input required autoFocus value={form.name} onChange={(event) => set('name', event.target.value)} maxLength={100} placeholder="e.g. Lemon ricotta toast" className={inputClass} data-testid="input-meal-name" /></Field>
           <Field label="Meal type"><select value={form.mealType} onChange={(event) => set('mealType', event.target.value as MealType)} className={inputClass} data-testid="select-meal-type"><option>Breakfast</option><option>Lunch</option><option>Dinner</option><option>Snack</option></select></Field>
           <Field label="Date"><input type="date" value={form.date} onChange={(event) => set('date', event.target.value)} className={inputClass} data-testid="input-meal-date" /></Field>
           <Field label="Time"><input type="time" value={form.time} onChange={(event) => set('time', event.target.value)} className={inputClass} data-testid="input-meal-time" /></Field>
@@ -101,10 +135,10 @@ export function MealDialog({ meal, onClose, onSave }: MealFormProps) {
             <span className="rounded-full bg-accent/35 px-2.5 py-1 font-mono-ui text-[10px] font-medium text-foreground">Manual entry</span>
           </div>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <Field label="Calories"><input type="number" min="0" value={form.calories} onChange={(event) => set('calories', Number(event.target.value))} className={inputClass} data-testid="input-meal-calories" /></Field>
-            <Field label="Protein · g"><input type="number" min="0" value={form.protein} onChange={(event) => set('protein', Number(event.target.value))} className={inputClass} data-testid="input-meal-protein" /></Field>
-            <Field label="Carbs · g"><input type="number" min="0" value={form.carbs} onChange={(event) => set('carbs', Number(event.target.value))} className={inputClass} data-testid="input-meal-carbs" /></Field>
-            <Field label="Fat · g"><input type="number" min="0" value={form.fat} onChange={(event) => set('fat', Number(event.target.value))} className={inputClass} data-testid="input-meal-fat" /></Field>
+            <Field label="Calories"><input type="number" min="0" max="99999" value={form.calories} onChange={(event) => set('calories', Number(event.target.value))} className={inputClass} data-testid="input-meal-calories" /></Field>
+            <Field label="Protein · g"><input type="number" min="0" max="9999" value={form.protein} onChange={(event) => set('protein', Number(event.target.value))} className={inputClass} data-testid="input-meal-protein" /></Field>
+            <Field label="Carbs · g"><input type="number" min="0" max="9999" value={form.carbs} onChange={(event) => set('carbs', Number(event.target.value))} className={inputClass} data-testid="input-meal-carbs" /></Field>
+            <Field label="Fat · g"><input type="number" min="0" max="9999" value={form.fat} onChange={(event) => set('fat', Number(event.target.value))} className={inputClass} data-testid="input-meal-fat" /></Field>
           </div>
         </div>
 
@@ -160,11 +194,11 @@ export function WorkoutDialog({ workout, onClose, onSave }: WorkoutFormProps) {
     <Modal title={workout ? 'Edit workout' : 'Add a workout'} eyebrow="Movement log" onClose={onClose}>
       <form onSubmit={submit} className="space-y-5">
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Workout name" wide><input required autoFocus value={form.name} onChange={(event) => set('name', event.target.value)} placeholder="e.g. Lunch break lift" className={inputClass} data-testid="input-workout-name" /></Field>
+          <Field label="Workout name" wide><input required autoFocus value={form.name} onChange={(event) => set('name', event.target.value)} maxLength={100} placeholder="e.g. Lunch break lift" className={inputClass} data-testid="input-workout-name" /></Field>
           <Field label="Activity"><select value={form.activity} onChange={(event) => set('activity', event.target.value)} className={inputClass} data-testid="select-workout-activity"><option>Strength</option><option>Run</option><option>Walk</option><option>Cycle</option><option>Yoga</option><option>Swim</option><option>Other</option></select></Field>
           <Field label="Date"><input type="date" value={form.date} onChange={(event) => set('date', event.target.value)} className={inputClass} data-testid="input-workout-date" /></Field>
-          <Field label="Duration · min"><input type="number" min="0" value={form.durationMinutes} onChange={(event) => set('durationMinutes', Number(event.target.value))} className={inputClass} data-testid="input-workout-duration" /></Field>
-          <Field label="Calories burned"><input type="number" min="0" value={form.caloriesBurned} onChange={(event) => set('caloriesBurned', Number(event.target.value))} className={inputClass} data-testid="input-workout-calories" /></Field>
+          <Field label="Duration · min"><input type="number" min="0" max="9999" value={form.durationMinutes} onChange={(event) => set('durationMinutes', Number(event.target.value))} className={inputClass} data-testid="input-workout-duration" /></Field>
+          <Field label="Calories burned"><input type="number" min="0" max="99999" value={form.caloriesBurned} onChange={(event) => set('caloriesBurned', Number(event.target.value))} className={inputClass} data-testid="input-workout-calories" /></Field>
           <Field label="Target areas" wide>
             <div className="grid gap-3 rounded-2xl border border-border bg-muted/35 p-3 sm:grid-cols-[150px_minmax(0,1fr)] sm:items-center sm:p-4">
               <MuscleMap targets={form.targetAreas} compact />
@@ -190,7 +224,7 @@ export function WorkoutDialog({ workout, onClose, onSave }: WorkoutFormProps) {
               </div>
             </div>
           </Field>
-          <Field label="Notes" wide><textarea value={form.notes} onChange={(event) => set('notes', event.target.value)} placeholder="How did it feel?" rows={3} className={`${inputClass} h-auto py-3`} data-testid="input-workout-notes" /></Field>
+          <Field label="Notes" wide><textarea value={form.notes} onChange={(event) => set('notes', event.target.value)} maxLength={500} placeholder="How did it feel?" rows={3} className={`${inputClass} h-auto py-3`} data-testid="input-workout-notes" /></Field>
         </div>
         {error ? <p className="text-sm font-semibold text-destructive" role="alert" data-testid="status-workout-form-error">{error}</p> : null}
         <div className="flex flex-col-reverse gap-2 pt-1 sm:flex-row sm:justify-end">

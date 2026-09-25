@@ -1,5 +1,5 @@
-import { Activity, ArrowRight, CalendarDays, ChevronRight, CircleAlert, Flame, Pencil, Plus, Search, Sparkles, Target, Trash2, TrendingUp, Utensils } from 'lucide-react';
-import { useMemo, useState, type FormEvent, type ReactNode } from 'react';
+import { Activity, ArrowRight, CalendarDays, ChevronRight, CircleAlert, Download, Flame, Pencil, Plus, Search, Sparkles, Target, Trash2, TrendingUp, Upload, Utensils, AlertTriangle } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { Link, Route, Router as WouterRouter, Switch, useLocation } from 'wouter';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { NutriSnapShell } from '@/components/nutrisnap-shell';
@@ -9,7 +9,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { Toaster } from '@/components/ui/toaster';
 import NotFound from '@/pages/not-found';
-import { todayKey, useNutriSnap, workoutTargetAreas, type Goals, type Meal, type Workout } from '@/lib/nutrisnap-storage';
+import { todayKey, useNutriSnap, workoutTargetAreas, exportData, downloadExport, parseImport, type Goals, type Meal, type Workout } from '@/lib/nutrisnap-storage';
 import { MuscleMap } from '@/components/muscle-map';
 
 const queryClient = new QueryClient();
@@ -148,7 +148,7 @@ function MiniWorkout({ workout, onEdit }: { workout: Workout; onEdit: () => void
 }
 
 function MealRow({ meal, onEdit }: { meal: Meal; onEdit: () => void }) {
-  return <div className="card-lift flex items-center gap-3 rounded-2xl border border-border bg-background/55 p-3.5" data-testid={`card-meal-${meal.id}`}><div className="grid size-10 shrink-0 place-items-center overflow-hidden rounded-xl bg-secondary text-primary">{meal.imageDataUrl ? <img src={meal.imageDataUrl} alt="" className="h-full w-full object-cover" data-testid={`img-meal-${meal.id}`} /> : <Utensils size={16} />}</div><div className="min-w-0 flex-1"><div className="flex items-center gap-2"><p className="truncate text-sm font-bold">{meal.name}</p><span className="hidden rounded-full bg-muted px-2 py-0.5 text-[9px] font-bold text-muted-foreground sm:inline">{meal.mealType}</span></div><p className="mt-0.5 text-xs text-muted-foreground">{meal.time} · {meal.calories} kcal</p></div><button type="button" onClick={onEdit} data-testid={`button-edit-meal-${meal.id}`} className="focus-ring grid size-8 place-items-center rounded-lg text-muted-foreground transition hover:bg-muted hover:text-foreground"><Pencil size={14} /></button></div>;
+  return <div className="card-lift flex items-center gap-3 rounded-2xl border border-border bg-background/55 p-3.5" data-testid={`card-meal-${meal.id}`}><div className="grid size-10 shrink-0 place-items-center overflow-hidden rounded-xl bg-secondary text-primary">{meal.imageDataUrl ? <img src={meal.imageDataUrl} alt={`Photo of ${meal.name}`} className="h-full w-full object-cover" data-testid={`img-meal-${meal.id}`} /> : <Utensils size={16} />}</div><div className="min-w-0 flex-1"><div className="flex items-center gap-2"><p className="truncate text-sm font-bold">{meal.name}</p><span className="hidden rounded-full bg-muted px-2 py-0.5 text-[9px] font-bold text-muted-foreground sm:inline">{meal.mealType}</span></div><p className="mt-0.5 text-xs text-muted-foreground">{meal.time} · {meal.calories} kcal</p></div><button type="button" onClick={onEdit} data-testid={`button-edit-meal-${meal.id}`} className="focus-ring grid size-8 place-items-center rounded-lg text-muted-foreground transition hover:bg-muted hover:text-foreground"><Pencil size={14} /></button></div>;
 }
 
 type MealsPageProps = { data: Data; onAdd: () => void; onEdit: (meal: Meal) => void };
@@ -166,7 +166,7 @@ function MealsPage({ data, onAdd, onEdit }: MealsPageProps) {
 }
 
 function MealListCard({ meal, index, onEdit, onDelete }: { meal: Meal; index: number; onEdit: () => void; onDelete: () => void }) {
-  return <article className="card-lift stagger-in flex flex-col gap-4 rounded-[22px] border border-border bg-card p-4 shadow-sm sm:flex-row sm:items-center" style={{ animationDelay: `${Math.min(index * 50, 250)}ms` }} data-testid={`row-meal-${meal.id}`}><div className="flex items-center gap-4 sm:flex-1"><div className="grid size-14 shrink-0 place-items-center overflow-hidden rounded-2xl bg-secondary text-primary">{meal.imageDataUrl ? <img src={meal.imageDataUrl} alt="" className="h-full w-full object-cover" data-testid={`img-meal-list-${meal.id}`} /> : <Utensils size={20} />}</div><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><h3 className="truncate font-display text-xl">{meal.name}</h3><span className="rounded-full bg-accent/40 px-2 py-1 text-[10px] font-bold">{meal.mealType}</span></div><p className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground"><CalendarDays size={13} /> {fullDate(meal.date)} · {meal.time}</p></div></div><div className="grid grid-cols-4 gap-2 border-t border-border pt-3 sm:w-[360px] sm:border-l sm:border-t-0 sm:pl-5 sm:pt-0">{[['Calories', `${meal.calories}`, 'kcal'], ['Protein', `${meal.protein}g`, 'protein'], ['Carbs', `${meal.carbs}g`, 'carbs'], ['Fat', `${meal.fat}g`, 'fat']].map(([label, value, unit]) => <div key={label}><p className="font-mono-ui text-[9px] uppercase tracking-[.1em] text-muted-foreground">{label}</p><p className="mt-1 text-sm font-bold">{value}</p><p className="text-[9px] text-muted-foreground">{unit}</p></div>)}</div><div className="flex gap-1 border-t border-border pt-3 sm:border-0 sm:pt-0"><button type="button" onClick={onEdit} data-testid={`button-edit-meal-list-${meal.id}`} className="focus-ring inline-flex h-9 flex-1 items-center justify-center gap-1.5 rounded-lg bg-muted px-3 text-xs font-bold transition hover:bg-secondary sm:flex-none"><Pencil size={13} /> Edit</button><button type="button" onClick={onDelete} data-testid={`button-delete-meal-${meal.id}`} className="focus-ring grid size-9 place-items-center rounded-lg text-muted-foreground transition hover:bg-destructive/10 hover:text-destructive"><Trash2 size={14} /></button></div></article>;
+  return <article className="card-lift stagger-in flex flex-col gap-4 rounded-[22px] border border-border bg-card p-4 shadow-sm sm:flex-row sm:items-center" style={{ animationDelay: `${Math.min(index * 50, 250)}ms` }} data-testid={`row-meal-${meal.id}`}><div className="flex items-center gap-4 sm:flex-1"><div className="grid size-14 shrink-0 place-items-center overflow-hidden rounded-2xl bg-secondary text-primary">{meal.imageDataUrl ? <img src={meal.imageDataUrl} alt={`Photo of ${meal.name}`} className="h-full w-full object-cover" data-testid={`img-meal-list-${meal.id}`} /> : <Utensils size={20} />}</div><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><h3 className="truncate font-display text-xl">{meal.name}</h3><span className="rounded-full bg-accent/40 px-2 py-1 text-[10px] font-bold">{meal.mealType}</span></div><p className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground"><CalendarDays size={13} /> {fullDate(meal.date)} · {meal.time}</p></div></div><div className="grid grid-cols-4 gap-2 border-t border-border pt-3 sm:w-[360px] sm:border-l sm:border-t-0 sm:pl-5 sm:pt-0">{[['Calories', `${meal.calories}`, 'kcal'], ['Protein', `${meal.protein}g`, 'protein'], ['Carbs', `${meal.carbs}g`, 'carbs'], ['Fat', `${meal.fat}g`, 'fat']].map(([label, value, unit]) => <div key={label}><p className="font-mono-ui text-[9px] uppercase tracking-[.1em] text-muted-foreground">{label}</p><p className="mt-1 text-sm font-bold">{value}</p><p className="text-[9px] text-muted-foreground">{unit}</p></div>)}</div><div className="flex gap-1 border-t border-border pt-3 sm:border-0 sm:pt-0"><button type="button" onClick={onEdit} data-testid={`button-edit-meal-list-${meal.id}`} className="focus-ring inline-flex h-9 flex-1 items-center justify-center gap-1.5 rounded-lg bg-muted px-3 text-xs font-bold transition hover:bg-secondary sm:flex-none"><Pencil size={13} /> Edit</button><button type="button" onClick={onDelete} data-testid={`button-delete-meal-${meal.id}`} className="focus-ring grid size-9 place-items-center rounded-lg text-muted-foreground transition hover:bg-destructive/10 hover:text-destructive"><Trash2 size={14} /></button></div></article>;
 }
 
 type WorkoutsPageProps = { data: Data; onAdd: () => void; onEdit: (workout: Workout) => void };
@@ -213,19 +213,51 @@ function PageIntro({ eyebrow, title, detail, actionLabel, onAction, testId }: { 
 function SettingsPage({ data }: { data: Data }) {
   const [form, setForm] = useState<Goals>(data.goals);
   const [saved, setSaved] = useState(false);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const set = (key: keyof Goals, value: string) => { setSaved(false); setForm((current) => ({ ...current, [key]: Number(value) || 0 })); };
-  const submit = (event: FormEvent) => { event.preventDefault(); data.saveGoals(form); setSaved(true); window.setTimeout(() => setSaved(false), 2400); };
+  const submit = (event: FormEvent) => {
+    event.preventDefault();
+    data.saveGoals(form);
+    setSaved(true);
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    timeoutRef.current = setTimeout(() => setSaved(false), 2400);
+  };
+  useEffect(() => () => { if (timeoutRef.current) clearTimeout(timeoutRef.current); }, []);
+  const handleExport = useCallback(() => {
+    downloadExport(exportData(data.meals, data.workouts, data.goals));
+  }, [data.meals, data.workouts, data.goals]);
+  const handleImport = useCallback(() => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json';
+    input.onchange = async () => {
+      const file = input.files?.[0];
+      if (!file) return;
+      const text = await file.text();
+      const parsed = parseImport(text);
+      if (!parsed) { alert('Invalid backup file.'); return; }
+      data.saveGoals(parsed.goals);
+      for (const meal of parsed.meals) data.addMeal(meal);
+      for (const workout of parsed.workouts) data.addWorkout(workout);
+    };
+    input.click();
+  }, [data]);
   return <div className="mx-auto max-w-[960px] px-5 py-8 sm:px-8 lg:px-12 lg:py-12">
     <div className="max-w-xl"><p className="font-mono-ui text-[10px] uppercase tracking-[.22em] text-primary" data-testid="text-settings-eyebrow">Personal settings</p><h1 className="mt-2 font-display text-4xl leading-[.95] tracking-[-.055em] sm:text-5xl" data-testid="text-settings-heading">Targets that fit<br />your real life.</h1><p className="mt-4 text-sm leading-relaxed text-muted-foreground">Set the daily numbers you want to use as a helpful reference. They are not a score.</p></div>
     <div className="mt-9 grid gap-5 lg:grid-cols-[1fr_280px]">
       <form onSubmit={submit} className="rounded-[24px] border border-border bg-card p-5 shadow-sm sm:p-7"><div className="flex items-start justify-between border-b border-border pb-5"><div><h2 className="font-display text-2xl">Daily nutrition targets</h2><p className="mt-1 text-xs text-muted-foreground">Adjust these whenever your needs change.</p></div><Target size={21} className="text-primary" /></div><div className="mt-6 space-y-5"><TargetInput label="Calories" unit="kcal" value={form.calories} onChange={(value) => set('calories', value)} testId="calories" /><TargetInput label="Protein" unit="g" value={form.protein} onChange={(value) => set('protein', value)} testId="protein" /><TargetInput label="Carbohydrates" unit="g" value={form.carbs} onChange={(value) => set('carbs', value)} testId="carbs" /><TargetInput label="Fat" unit="g" value={form.fat} onChange={(value) => set('fat', value)} testId="fat" /></div><div className="mt-7 flex flex-col items-stretch gap-3 border-t border-border pt-5 sm:flex-row sm:items-center sm:justify-between"><p className="text-xs text-muted-foreground">Saved privately in your browser.</p><button type="submit" data-testid="button-save-goals" className="focus-ring inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-primary px-5 text-sm font-bold text-primary-foreground transition hover:brightness-105">{saved ? <><Sparkles size={15} /> Saved</> : 'Save targets'}</button></div></form>
-      <div className="space-y-5"><div className="rounded-[24px] bg-accent/55 p-5"><div className="flex items-center gap-2 text-primary"><CircleAlert size={16} /><span className="font-mono-ui text-[10px] uppercase tracking-[.18em]">A gentle note</span></div><p className="mt-4 font-display text-2xl leading-tight">Numbers are a map, not a grade.</p><p className="mt-3 text-xs leading-relaxed text-muted-foreground">Targets can give your choices a little shape. Listen to your body first.</p></div><div className="rounded-[24px] border border-border bg-card p-5"><p className="font-mono-ui text-[10px] uppercase tracking-[.18em] text-muted-foreground">Your current split</p><div className="mt-5 space-y-3"><TargetSummary label="Calories" value={form.calories} unit="kcal" /><TargetSummary label="Protein" value={form.protein} unit="g" /><TargetSummary label="Carbs" value={form.carbs} unit="g" /><TargetSummary label="Fat" value={form.fat} unit="g" /></div></div></div>
+      <div className="space-y-5">
+        {data.storageWarning ? <div className="rounded-[24px] border border-destructive/30 bg-destructive/10 p-5"><div className="flex items-center gap-2 text-destructive"><AlertTriangle size={16} /><span className="font-mono-ui text-[10px] uppercase tracking-[.18em]">Storage almost full</span></div><p className="mt-3 text-xs leading-relaxed text-muted-foreground">Your browser storage is {data.storageWarning.percent}% full. Delete some meals or workouts to free up space.</p></div> : null}
+        <div className="rounded-[24px] bg-accent/55 p-5"><div className="flex items-center gap-2 text-primary"><CircleAlert size={16} /><span className="font-mono-ui text-[10px] uppercase tracking-[.18em]">A gentle note</span></div><p className="mt-4 font-display text-2xl leading-tight">Numbers are a map, not a grade.</p><p className="mt-3 text-xs leading-relaxed text-muted-foreground">Targets can give your choices a little shape. Listen to your body first.</p></div>
+        <div className="rounded-[24px] border border-border bg-card p-5"><p className="font-mono-ui text-[10px] uppercase tracking-[.18em] text-muted-foreground">Your current split</p><div className="mt-5 space-y-3"><TargetSummary label="Calories" value={form.calories} unit="kcal" /><TargetSummary label="Protein" value={form.protein} unit="g" /><TargetSummary label="Carbs" value={form.carbs} unit="g" /><TargetSummary label="Fat" value={form.fat} unit="g" /></div></div>
+        <div className="rounded-[24px] border border-border bg-card p-5"><p className="font-mono-ui text-[10px] uppercase tracking-[.18em] text-muted-foreground">Data backup</p><p className="mt-2 text-xs text-muted-foreground">Export your meals and workouts as a JSON file, or import a previous backup.</p><div className="mt-4 flex gap-2"><button type="button" onClick={handleExport} data-testid="button-export-data" className="focus-ring inline-flex h-10 items-center gap-2 rounded-xl border border-border bg-card px-4 text-xs font-bold transition hover:bg-muted"><Download size={14} /> Export</button><button type="button" onClick={handleImport} data-testid="button-import-data" className="focus-ring inline-flex h-10 items-center gap-2 rounded-xl border border-border bg-card px-4 text-xs font-bold transition hover:bg-muted"><Upload size={14} /> Import</button></div></div>
+      </div>
     </div>
   </div>;
 }
 
 function TargetInput({ label, unit, value, onChange, testId }: { label: string; unit: string; value: number; onChange: (value: string) => void; testId: string }) {
-  return <label className="flex items-center justify-between gap-4"><span><span className="block text-sm font-bold">{label}</span><span className="mt-0.5 block text-xs text-muted-foreground">Daily goal</span></span><span className="flex items-center gap-2"><input type="number" min="0" value={value} onChange={(event) => onChange(event.target.value)} className="focus-ring h-11 w-28 rounded-xl border border-input bg-background px-3 text-right font-mono-ui text-sm outline-none focus:border-primary" data-testid={`input-goal-${testId}`} /><span className="w-9 text-xs font-bold text-muted-foreground">{unit}</span></span></label>;
+  return <label className="flex items-center justify-between gap-4"><span><span className="block text-sm font-bold">{label}</span><span className="mt-0.5 block text-xs text-muted-foreground">Daily goal</span></span><span className="flex items-center gap-2"><input type="number" min="0" max="99999" value={value} onChange={(event) => onChange(event.target.value)} className="focus-ring h-11 w-28 rounded-xl border border-input bg-background px-3 text-right font-mono-ui text-sm outline-none focus:border-primary" data-testid={`input-goal-${testId}`} /><span className="w-9 text-xs font-bold text-muted-foreground">{unit}</span></span></label>;
 }
 
 function TargetSummary({ label, value, unit }: { label: string; value: number; unit: string }) {
