@@ -171,12 +171,7 @@ export function MealDialog({ meal, onClose, onSave }: MealFormProps) {
       <form onSubmit={submit} className="space-y-5">
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Meal name" wide>
-            <div className="flex gap-2">
-              <input required autoFocus value={form.name} onChange={(event) => set('name', event.target.value)} maxLength={100} placeholder="e.g. 2 eggs, toast, and coffee" className={inputClass} data-testid="input-meal-name" />
-              <button type="button" onClick={handleNutritionLookup} disabled={looking || !form.name.trim()} className="focus-ring h-11 shrink-0 rounded-xl bg-accent px-3 text-xs font-bold text-accent-foreground transition hover:brightness-105 disabled:opacity-50" data-testid="button-nutrition-lookup">
-                {looking ? '...' : 'Lookup'}
-              </button>
-            </div>
+            <input required autoFocus value={form.name} onChange={(event) => set('name', event.target.value)} maxLength={100} placeholder="e.g. 2 eggs, toast, and coffee" className={inputClass} data-testid="input-meal-name" />
           </Field>
           <Field label="Meal type"><select value={form.mealType} onChange={(event) => set('mealType', event.target.value as MealType)} className={inputClass} data-testid="select-meal-type"><option>Breakfast</option><option>Lunch</option><option>Dinner</option><option>Snack</option></select></Field>
           <Field label="Date"><input type="date" value={form.date} onChange={(event) => set('date', event.target.value)} className={inputClass} data-testid="input-meal-date" /></Field>
@@ -185,9 +180,15 @@ export function MealDialog({ meal, onClose, onSave }: MealFormProps) {
 
         <div className="rounded-2xl border border-border bg-background/70 p-4">
           <div className="mb-3 flex items-center justify-between">
-            <div><p className="text-sm font-bold">Nutrition facts</p><p className="text-xs text-muted-foreground">Enter the values from your label or best knowledge.</p></div>
+            <div><p className="text-sm font-bold">Nutrition facts</p><p className="text-xs text-muted-foreground">Type your meal name above, then auto-fill or enter values manually.</p></div>
             <span className="rounded-full bg-accent/35 px-2.5 py-1 font-mono-ui text-[10px] font-medium text-foreground">Manual entry</span>
           </div>
+          <div className="mb-3">
+            <button type="button" onClick={handleNutritionLookup} disabled={looking || !form.name.trim()} className="focus-ring w-full h-10 rounded-xl bg-primary px-4 text-sm font-bold text-primary-foreground transition hover:brightness-105 disabled:opacity-40 disabled:cursor-not-allowed" data-testid="button-nutrition-lookup">
+              {looking ? 'Looking up nutrition...' : 'Auto-fill nutrition from food name'}
+            </button>
+          </div>
+          {lookupError ? <p className="mb-3 text-xs text-destructive" role="status">{lookupError}</p> : null}
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <Field label="Calories"><input type="number" min="0" max="99999" value={form.calories} onChange={(event) => set('calories', Number(event.target.value))} className={inputClass} data-testid="input-meal-calories" /></Field>
             <Field label="Protein · g"><input type="number" min="0" max="9999" value={form.protein} onChange={(event) => set('protein', Number(event.target.value))} className={inputClass} data-testid="input-meal-protein" /></Field>
@@ -195,8 +196,6 @@ export function MealDialog({ meal, onClose, onSave }: MealFormProps) {
             <Field label="Fat · g"><input type="number" min="0" max="9999" value={form.fat} onChange={(event) => set('fat', Number(event.target.value))} className={inputClass} data-testid="input-meal-fat" /></Field>
           </div>
         </div>
-
-        {lookupError ? <p className="text-xs text-muted-foreground" role="status">{lookupError}</p> : null}
 
         <div className="grid gap-4 sm:grid-cols-[1fr_1.2fr]">
           <label className="group relative flex min-h-[128px] cursor-pointer flex-col items-center justify-center overflow-hidden rounded-2xl border border-dashed border-primary/35 bg-secondary/45 p-4 text-center transition hover:border-primary hover:bg-secondary">
