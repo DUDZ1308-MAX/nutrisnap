@@ -98,6 +98,8 @@ export function MealDialog({ meal, onClose, onSave }: MealFormProps) {
     imageDataUrl: meal?.imageDataUrl,
   });
   const [error, setError] = useState('');
+  const [looking, setLooking] = useState(false);
+  const [lookupError, setLookupError] = useState('');
 
   useEffect(() => {
     setForm({
@@ -125,6 +127,35 @@ export function MealDialog({ meal, onClose, onSave }: MealFormProps) {
     reader.onload = () => set('imageDataUrl', String(reader.result));
     reader.readAsDataURL(file);
   };
+  const handleNutritionLookup = async () => {
+    if (!form.name.trim()) return;
+    setLooking(true);
+    setLookupError('');
+    try {
+      const res = await fetch('https://everyone.food/api/calories', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ meal: form.name.trim() }),
+      });
+      const data = await res.json();
+      if (data.totals) {
+        setForm((current) => ({
+          ...current,
+          calories: data.totals.calories ?? current.calories,
+          protein: data.totals.protein ?? current.protein,
+          carbs: data.totals.carbs ?? current.carbs,
+          fat: data.totals.fat ?? current.fat,
+        }));
+      } else {
+        setLookupError('Food not found — enter values manually.');
+      }
+    } catch {
+      setLookupError('Could not reach nutrition API — try again.');
+    } finally {
+      setLooking(false);
+    }
+  };
+
   const submit = (event: FormEvent) => {
     event.preventDefault();
     if (!form.name.trim()) {
@@ -139,7 +170,14 @@ export function MealDialog({ meal, onClose, onSave }: MealFormProps) {
     <Modal title={meal ? 'Edit meal' : 'Add a meal'} eyebrow="Manual nutrition log" onClose={onClose}>
       <form onSubmit={submit} className="space-y-5">
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Meal name" wide><input required autoFocus value={form.name} onChange={(event) => set('name', event.target.value)} maxLength={100} placeholder="e.g. Lemon ricotta toast" className={inputClass} data-testid="input-meal-name" /></Field>
+          <Field label="Meal name" wide>
+            <div className="flex gap-2">
+              <input required autoFocus value={form.name} onChange={(event) => set('name', event.target.value)} maxLength={100} placeholder="e.g. 2 eggs, toast, and coffee" className={inputClass} data-testid="input-meal-name" />
+              <button type="button" onClick={handleNutritionLookup} disabled={looking || !form.name.trim()} className="focus-ring h-11 shrink-0 rounded-xl bg-accent px-3 text-xs font-bold text-accent-foreground transition hover:brightness-105 disabled:opacity-50" data-testid="button-nutrition-lookup">
+                {looking ? '...' : 'Lookup'}
+              </button>
+            </div>
+          </Field>
           <Field label="Meal type"><select value={form.mealType} onChange={(event) => set('mealType', event.target.value as MealType)} className={inputClass} data-testid="select-meal-type"><option>Breakfast</option><option>Lunch</option><option>Dinner</option><option>Snack</option></select></Field>
           <Field label="Date"><input type="date" value={form.date} onChange={(event) => set('date', event.target.value)} className={inputClass} data-testid="input-meal-date" /></Field>
           <Field label="Time"><input type="time" value={form.time} onChange={(event) => set('time', event.target.value)} className={inputClass} data-testid="input-meal-time" /></Field>
@@ -157,6 +195,8 @@ export function MealDialog({ meal, onClose, onSave }: MealFormProps) {
             <Field label="Fat · g"><input type="number" min="0" max="9999" value={form.fat} onChange={(event) => set('fat', Number(event.target.value))} className={inputClass} data-testid="input-meal-fat" /></Field>
           </div>
         </div>
+
+        {lookupError ? <p className="text-xs text-muted-foreground" role="status">{lookupError}</p> : null}
 
         <div className="grid gap-4 sm:grid-cols-[1fr_1.2fr]">
           <label className="group relative flex min-h-[128px] cursor-pointer flex-col items-center justify-center overflow-hidden rounded-2xl border border-dashed border-primary/35 bg-secondary/45 p-4 text-center transition hover:border-primary hover:bg-secondary">
