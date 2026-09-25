@@ -141,10 +141,10 @@ export function MealDialog({ meal, onClose, onSave }: MealFormProps) {
       if (data.totals) {
         setForm((current) => ({
           ...current,
-          calories: data.totals.calories ?? current.calories,
-          protein: data.totals.protein ?? current.protein,
-          carbs: data.totals.carbs ?? current.carbs,
-          fat: data.totals.fat ?? current.fat,
+          calories: Math.round(data.totals.calories ?? current.calories),
+          protein: Math.round(data.totals.protein ?? current.protein),
+          carbs: Math.round(data.totals.carbs ?? current.carbs),
+          fat: Math.round(data.totals.fat ?? current.fat),
         }));
       } else {
         setLookupError('Food not found — enter values manually.');
