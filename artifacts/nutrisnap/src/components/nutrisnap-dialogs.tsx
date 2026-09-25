@@ -63,6 +63,22 @@ function Field({ label, children, wide = false }: { label: string; children: Rea
 
 const inputClass = 'focus-ring h-11 w-full rounded-xl border border-input bg-background px-3.5 text-sm text-foreground outline-none transition placeholder:text-muted-foreground/60 focus:border-primary focus:ring-2 focus:ring-primary/10';
 
+const activityTargetMap: Record<string, string[]> = {
+  Strength: ['Chest', 'Back', 'Shoulders', 'Biceps', 'Triceps', 'Quads', 'Hamstrings', 'Glutes'],
+  Run: ['Quads', 'Hamstrings', 'Glutes', 'Calves'],
+  Walk: ['Quads', 'Hamstrings', 'Calves'],
+  Cycle: ['Quads', 'Hamstrings', 'Glutes', 'Calves'],
+  Yoga: ['Core', 'Shoulders', 'Quads', 'Hamstrings', 'Glutes'],
+  Swim: ['Chest', 'Back', 'Shoulders', 'Core'],
+  HIIT: ['Core', 'Quads', 'Glutes'],
+  Pilates: ['Core', 'Glutes', 'Hamstrings'],
+  Rowing: ['Back', 'Biceps', 'Glutes', 'Hamstrings'],
+  'Jump Rope': ['Calves', 'Quads', 'Core'],
+  Stretching: ['Hamstrings', 'Quads', 'Glutes', 'Shoulders'],
+  Dance: ['Quads', 'Glutes', 'Calves', 'Core'],
+  Other: [],
+};
+
 type MealFormProps = {
   meal?: Meal;
   onClose: () => void;
@@ -177,13 +193,20 @@ export function WorkoutDialog({ workout, onClose, onSave }: WorkoutFormProps) {
     notes: workout?.notes ?? '',
   });
   const [error, setError] = useState('');
-  const set = (key: keyof typeof form, value: string | number) => setForm((current) => ({ ...current, [key]: value }));
+  const set = (key: keyof typeof form, value: string | number | string[]) => setForm((current) => ({ ...current, [key]: value }));
   const toggleTargetArea = (target: WorkoutTarget) => setForm((current) => ({
     ...current,
     targetAreas: current.targetAreas.includes(target)
       ? current.targetAreas.filter((area) => area !== target)
       : [...current.targetAreas, target],
   }));
+  const handleActivityChange = (activity: string) => {
+    setForm((current) => ({
+      ...current,
+      activity,
+      targetAreas: activityTargetMap[activity] as WorkoutTarget[] ?? [],
+    }));
+  };
   const submit = (event: FormEvent) => {
     event.preventDefault();
     if (!form.name.trim()) { setError('Give this workout a name first.'); return; }
@@ -195,7 +218,7 @@ export function WorkoutDialog({ workout, onClose, onSave }: WorkoutFormProps) {
       <form onSubmit={submit} className="space-y-5">
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Workout name" wide><input required autoFocus value={form.name} onChange={(event) => set('name', event.target.value)} maxLength={100} placeholder="e.g. Lunch break lift" className={inputClass} data-testid="input-workout-name" /></Field>
-          <Field label="Activity"><select value={form.activity} onChange={(event) => set('activity', event.target.value)} className={inputClass} data-testid="select-workout-activity"><option>Strength</option><option>Run</option><option>Walk</option><option>Cycle</option><option>Yoga</option><option>Swim</option><option>Other</option></select></Field>
+          <Field label="Activity"><select value={form.activity} onChange={(event) => handleActivityChange(event.target.value)} className={inputClass} data-testid="select-workout-activity"><option>Strength</option><option>Run</option><option>Walk</option><option>Cycle</option><option>Yoga</option><option>Swim</option><option>HIIT</option><option>Pilates</option><option>Rowing</option><option>Jump Rope</option><option>Stretching</option><option>Dance</option><option>Other</option></select></Field>
           <Field label="Date"><input type="date" value={form.date} onChange={(event) => set('date', event.target.value)} className={inputClass} data-testid="input-workout-date" /></Field>
           <Field label="Duration · min"><input type="number" min="0" max="9999" value={form.durationMinutes} onChange={(event) => set('durationMinutes', Number(event.target.value))} className={inputClass} data-testid="input-workout-duration" /></Field>
           <Field label="Calories burned"><input type="number" min="0" max="99999" value={form.caloriesBurned} onChange={(event) => set('caloriesBurned', Number(event.target.value))} className={inputClass} data-testid="input-workout-calories" /></Field>
@@ -203,7 +226,7 @@ export function WorkoutDialog({ workout, onClose, onSave }: WorkoutFormProps) {
             <div className="grid gap-3 rounded-2xl border border-border bg-muted/35 p-3 sm:grid-cols-[150px_minmax(0,1fr)] sm:items-center sm:p-4">
               <MuscleMap targets={form.targetAreas} compact />
               <div>
-                <p className="mb-2 text-xs leading-relaxed text-muted-foreground">Choose the areas this session focused on.</p>
+                <p className="mb-2 text-xs leading-relaxed text-muted-foreground">Targets auto-fill based on activity. Toggle any you want.</p>
                 <div className="grid grid-cols-2 gap-2">
                   {workoutTargetAreas.map((target) => {
                     const selected = form.targetAreas.includes(target.id);

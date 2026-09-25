@@ -30,6 +30,62 @@ const exerciseVideos = [
     targets: 'Quads · Glutes · Hamstrings',
     cues: ['Take a step that lets you stay balanced.', 'Lower under control with your torso upright.', 'Keep your front knee tracking in line with your toes.'],
   },
+  {
+    id: 'HmzhfGUGQRc',
+    exercise: 'Bench press',
+    source: 'Runna',
+    targets: 'Chest · Shoulders · Triceps',
+    cues: ['Lie flat with your eyes under the bar.', 'Grip the bar just wider than shoulder width.', 'Lower the bar to your chest, then press back up.'],
+  },
+  {
+    id: 'sIvJTfGxdFo',
+    exercise: 'Pull-up',
+    source: 'ATHLEAN-X',
+    targets: 'Back · Biceps',
+    cues: ['Grip the bar slightly wider than shoulder width.', 'Pull your elbows down to your sides.', 'Control the descent back to a full hang.'],
+  },
+  {
+    id: 'nNMR9fRGRjQ',
+    exercise: 'Shoulder press',
+    source: 'Barbell Logic',
+    targets: 'Shoulders · Triceps',
+    cues: ['Grip the bar at shoulder width with straight wrists.', 'Press the bar straight up, moving your head out of the way.', 'Shrug your traps at the top for full lockout.'],
+  },
+  {
+    id: 'ASdvN_XEl_c',
+    exercise: 'Plank',
+    source: 'BowFlex',
+    targets: 'Core',
+    cues: ['Support yourself on your forearms with elbows under shoulders.', 'Keep your body in a straight line from head to heels.', 'Squeeze your glutes and hold without letting hips sag.'],
+  },
+  {
+    id: 'qLBImHhCXSw',
+    exercise: 'Burpee',
+    source: 'Well+Good',
+    targets: 'Full body',
+    cues: ['Start with a strong jump, landing softly into a squat.', 'Place your hands down and kick your feet back into a plank.', 'Jump your feet forward and explode back up.'],
+  },
+  {
+    id: 'cnyTQDSE884',
+    exercise: 'Mountain climber',
+    source: 'Well+Good',
+    targets: 'Core · Quads',
+    cues: ['Start in a push-up position with shoulders over wrists.', 'Drive one knee toward your chest at a time.', 'Keep your hips level and core engaged throughout.'],
+  },
+  {
+    id: 'UmY5lVwpycE',
+    exercise: 'Hip thrust',
+    source: 'Dr. Carl Baird',
+    targets: 'Glutes · Hamstrings',
+    cues: ['Rest your upper back on a bench with feet flat on the floor.', 'Drive through your heels to lift your hips up.', 'Squeeze your glutes at the top with a neutral spine.'],
+  },
+  {
+    id: 'BXm_cYw-5Wk',
+    exercise: 'Calf raise',
+    source: 'Iron Paradise',
+    targets: 'Calves',
+    cues: ['Stand on the edge of a step with heels hanging off.', 'Lower your heels for a full stretch.', 'Press up onto your toes and pause at the top.'],
+  },
 ];
 
 export function WorkoutVideoGuide() {

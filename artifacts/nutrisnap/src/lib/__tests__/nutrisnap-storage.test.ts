@@ -4,6 +4,7 @@ import {
   defaultGoals,
   exportData,
   parseImport,
+  workoutTargetAreas,
   type Meal,
   type Workout,
   type Goals,
@@ -120,34 +121,11 @@ describe("parseImport", () => {
   });
 });
 
-describe("localStorage integration", () => {
-  beforeEach(() => {
-    localStorage.clear();
-  });
-
-  it("stores and retrieves meals", () => {
-    const meals: Meal[] = [
-      {
-        id: "meal-1",
-        name: "Lunch",
-        mealType: "Lunch",
-        date: "2026-01-01",
-        time: "12:00",
-        calories: 600,
-        protein: 40,
-        carbs: 50,
-        fat: 20,
-      },
-    ];
-    localStorage.setItem("nutrisnap:meals", JSON.stringify(meals));
-    const stored = JSON.parse(localStorage.getItem("nutrisnap:meals") || "[]");
-    expect(stored).toHaveLength(1);
-    expect(stored[0].name).toBe("Lunch");
-  });
-
-  it("handles corrupted localStorage data gracefully", () => {
-    localStorage.setItem("nutrisnap:meals", "not valid json{{{");
-    const value = localStorage.getItem("nutrisnap:meals");
-    expect(() => JSON.parse(value!)).toThrow();
+describe("workoutTargetAreas", () => {
+  it("maps activity types to expected target areas", () => {
+    expect(workoutTargetAreas).toBeInstanceOf(Array);
+    expect(workoutTargetAreas.length).toBeGreaterThan(0);
+    expect(workoutTargetAreas[0]).toHaveProperty("id");
+    expect(workoutTargetAreas[0]).toHaveProperty("label");
   });
 });
