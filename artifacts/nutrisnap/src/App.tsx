@@ -1,4 +1,4 @@
-import { Activity, ArrowRight, CalendarDays, ChevronRight, CircleAlert, Download, Flame, Pencil, Plus, Search, Sparkles, Target, Trash2, TrendingUp, Upload, Utensils, AlertTriangle } from 'lucide-react';
+import { Activity, ArrowRight, CalendarDays, ChevronRight, CircleAlert, Download, Flame, LogOut, Pencil, Plus, Search, Sparkles, Target, Trash2, TrendingUp, Upload, Utensils } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { Link, Route, Router as WouterRouter, Switch, useLocation } from 'wouter';
 import { ErrorBoundary } from '@/components/error-boundary';
@@ -9,6 +9,9 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { Toaster } from '@/components/ui/toaster';
 import NotFound from '@/pages/not-found';
+import LoginPage from '@/pages/login';
+import RegisterPage from '@/pages/register';
+import { AuthProvider, useAuth } from '@/lib/auth-context';
 import { todayKey, useNutriSnap, workoutTargetAreas, exportData, downloadExport, parseImport, type Goals, type Meal, type Workout } from '@/lib/nutrisnap-storage';
 import { MuscleMap } from '@/components/muscle-map';
 
@@ -24,7 +27,7 @@ function RoutedErrorBoundary({ children }: { children: ReactNode }) {
   return <ErrorBoundary resetKey={location}>{children}</ErrorBoundary>;
 }
 
-function App() {
+function AuthenticatedApp() {
   const [modal, setModal] = useState<'meal' | 'workout' | null>(null);
   const [editingMeal, setEditingMeal] = useState<Meal | undefined>();
   const [editingWorkout, setEditingWorkout] = useState<Workout | undefined>();
@@ -35,30 +38,53 @@ function App() {
   if (!data.ready) return <LoadingScreen />;
 
   return (
+    <NutriSnapShell onQuickAdd={shellAdd}>
+      <RoutedErrorBoundary>
+        <Switch>
+          <Route path="/">
+            <Overview data={data} onAddMeal={shellAdd} onAddWorkout={shellAdd} onEditMeal={(meal) => { setEditingMeal(meal); setModal('meal'); }} onEditWorkout={(workout) => { setEditingWorkout(workout); setModal('workout'); }} />
+          </Route>
+          <Route path="/meals">
+            <MealsPage data={data} onAdd={() => shellAdd('meal')} onEdit={(meal) => { setEditingMeal(meal); setModal('meal'); }} />
+          </Route>
+          <Route path="/workouts">
+            <WorkoutsPage data={data} onAdd={() => shellAdd('workout')} onEdit={(workout) => { setEditingWorkout(workout); setModal('workout'); }} />
+          </Route>
+          <Route path="/settings"><SettingsPage data={data} /></Route>
+          <Route component={NotFound} />
+        </Switch>
+      </RoutedErrorBoundary>
+      {modal === 'meal' ? <MealDialog meal={editingMeal} onClose={closeModal} onSave={(meal) => { editingMeal ? data.updateMeal(editingMeal.id, meal) : data.addMeal(meal); closeModal(); }} /> : null}
+      {modal === 'workout' ? <WorkoutDialog workout={editingWorkout} onClose={closeModal} onSave={(workout) => { editingWorkout ? data.updateWorkout(editingWorkout.id, workout) : data.addWorkout(workout); closeModal(); }} /> : null}
+    </NutriSnapShell>
+  );
+}
+
+function AppRoutes() {
+  const { user, loading } = useAuth();
+
+  if (loading) return <LoadingScreen />;
+
+  return (
+    <Switch>
+      <Route path="/login"><LoginPage /></Route>
+      <Route path="/register"><RegisterPage /></Route>
+      <Route>{user ? <AuthenticatedApp /> : <LoginPage />}</Route>
+      <Route component={NotFound} />
+    </Switch>
+  );
+}
+
+function App() {
+  return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}>
-          <NutriSnapShell onQuickAdd={shellAdd}>
-            <RoutedErrorBoundary>
-              <Switch>
-                <Route path="/">
-                  <Overview data={data} onAddMeal={shellAdd} onAddWorkout={shellAdd} onEditMeal={(meal) => { setEditingMeal(meal); setModal('meal'); }} onEditWorkout={(workout) => { setEditingWorkout(workout); setModal('workout'); }} />
-                </Route>
-                <Route path="/meals">
-                  <MealsPage data={data} onAdd={() => shellAdd('meal')} onEdit={(meal) => { setEditingMeal(meal); setModal('meal'); }} />
-                </Route>
-                <Route path="/workouts">
-                  <WorkoutsPage data={data} onAdd={() => shellAdd('workout')} onEdit={(workout) => { setEditingWorkout(workout); setModal('workout'); }} />
-                </Route>
-                <Route path="/settings"><SettingsPage data={data} /></Route>
-                <Route component={NotFound} />
-              </Switch>
-            </RoutedErrorBoundary>
-          </NutriSnapShell>
-        </WouterRouter>
+        <AuthProvider>
+          <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}>
+            <AppRoutes />
+          </WouterRouter>
+        </AuthProvider>
         <Toaster />
-        {modal === 'meal' ? <MealDialog meal={editingMeal} onClose={closeModal} onSave={(meal) => { editingMeal ? data.updateMeal(editingMeal.id, meal) : data.addMeal(meal); closeModal(); }} /> : null}
-        {modal === 'workout' ? <WorkoutDialog workout={editingWorkout} onClose={closeModal} onSave={(workout) => { editingWorkout ? data.updateWorkout(editingWorkout.id, workout) : data.addWorkout(workout); closeModal(); }} /> : null}
       </TooltipProvider>
     </QueryClientProvider>
   );
@@ -211,6 +237,7 @@ function PageIntro({ eyebrow, title, detail, actionLabel, onAction, testId }: { 
 }
 
 function SettingsPage({ data }: { data: Data }) {
+  const { user, logout } = useAuth();
   const [form, setForm] = useState<Goals>(data.goals);
   const [saved, setSaved] = useState(false);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -245,9 +272,9 @@ function SettingsPage({ data }: { data: Data }) {
   return <div className="mx-auto max-w-[960px] px-5 py-8 sm:px-8 lg:px-12 lg:py-12">
     <div className="max-w-xl"><p className="font-mono-ui text-[10px] uppercase tracking-[.22em] text-primary" data-testid="text-settings-eyebrow">Personal settings</p><h1 className="mt-2 font-display text-4xl leading-[.95] tracking-[-.055em] sm:text-5xl" data-testid="text-settings-heading">Targets that fit<br />your real life.</h1><p className="mt-4 text-sm leading-relaxed text-muted-foreground">Set the daily numbers you want to use as a helpful reference. They are not a score.</p></div>
     <div className="mt-9 grid gap-5 lg:grid-cols-[1fr_280px]">
-      <form onSubmit={submit} className="rounded-[24px] border border-border bg-card p-5 shadow-sm sm:p-7"><div className="flex items-start justify-between border-b border-border pb-5"><div><h2 className="font-display text-2xl">Daily nutrition targets</h2><p className="mt-1 text-xs text-muted-foreground">Adjust these whenever your needs change.</p></div><Target size={21} className="text-primary" /></div><div className="mt-6 space-y-5"><TargetInput label="Calories" unit="kcal" value={form.calories} onChange={(value) => set('calories', value)} testId="calories" /><TargetInput label="Protein" unit="g" value={form.protein} onChange={(value) => set('protein', value)} testId="protein" /><TargetInput label="Carbohydrates" unit="g" value={form.carbs} onChange={(value) => set('carbs', value)} testId="carbs" /><TargetInput label="Fat" unit="g" value={form.fat} onChange={(value) => set('fat', value)} testId="fat" /></div><div className="mt-7 flex flex-col items-stretch gap-3 border-t border-border pt-5 sm:flex-row sm:items-center sm:justify-between"><p className="text-xs text-muted-foreground">Saved privately in your browser.</p><button type="submit" data-testid="button-save-goals" className="focus-ring inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-primary px-5 text-sm font-bold text-primary-foreground transition hover:brightness-105">{saved ? <><Sparkles size={15} /> Saved</> : 'Save targets'}</button></div></form>
+      <form onSubmit={submit} className="rounded-[24px] border border-border bg-card p-5 shadow-sm sm:p-7"><div className="flex items-start justify-between border-b border-border pb-5"><div><h2 className="font-display text-2xl">Daily nutrition targets</h2><p className="mt-1 text-xs text-muted-foreground">Adjust these whenever your needs change.</p></div><Target size={21} className="text-primary" /></div><div className="mt-6 space-y-5"><TargetInput label="Calories" unit="kcal" value={form.calories} onChange={(value) => set('calories', value)} testId="calories" /><TargetInput label="Protein" unit="g" value={form.protein} onChange={(value) => set('protein', value)} testId="protein" /><TargetInput label="Carbohydrates" unit="g" value={form.carbs} onChange={(value) => set('carbs', value)} testId="carbs" /><TargetInput label="Fat" unit="g" value={form.fat} onChange={(value) => set('fat', value)} testId="fat" /></div><div className="mt-7 flex flex-col items-stretch gap-3 border-t border-border pt-5 sm:flex-row sm:items-center sm:justify-between"><p className="text-xs text-muted-foreground">Saved to your account.</p><button type="submit" data-testid="button-save-goals" className="focus-ring inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-primary px-5 text-sm font-bold text-primary-foreground transition hover:brightness-105">{saved ? <><Sparkles size={15} /> Saved</> : 'Save targets'}</button></div></form>
       <div className="space-y-5">
-        {data.storageWarning ? <div className="rounded-[24px] border border-destructive/30 bg-destructive/10 p-5"><div className="flex items-center gap-2 text-destructive"><AlertTriangle size={16} /><span className="font-mono-ui text-[10px] uppercase tracking-[.18em]">Storage almost full</span></div><p className="mt-3 text-xs leading-relaxed text-muted-foreground">Your browser storage is {data.storageWarning.percent}% full. Delete some meals or workouts to free up space.</p></div> : null}
+        {user ? <div className="rounded-[24px] border border-border bg-card p-5"><p className="font-mono-ui text-[10px] uppercase tracking-[.18em] text-muted-foreground">Account</p><p className="mt-3 text-sm font-bold">{user.username}</p><p className="mt-1 text-xs text-muted-foreground">{user.email}</p><button type="button" onClick={logout} data-testid="button-logout" className="focus-ring mt-4 inline-flex h-10 items-center gap-2 rounded-xl border border-border bg-card px-4 text-xs font-bold transition hover:bg-muted"><LogOut size={14} /> Sign out</button></div> : null}
         <div className="rounded-[24px] bg-accent/55 p-5"><div className="flex items-center gap-2 text-primary"><CircleAlert size={16} /><span className="font-mono-ui text-[10px] uppercase tracking-[.18em]">A gentle note</span></div><p className="mt-4 font-display text-2xl leading-tight">Numbers are a map, not a grade.</p><p className="mt-3 text-xs leading-relaxed text-muted-foreground">Targets can give your choices a little shape. Listen to your body first.</p></div>
         <div className="rounded-[24px] border border-border bg-card p-5"><p className="font-mono-ui text-[10px] uppercase tracking-[.18em] text-muted-foreground">Your current split</p><div className="mt-5 space-y-3"><TargetSummary label="Calories" value={form.calories} unit="kcal" /><TargetSummary label="Protein" value={form.protein} unit="g" /><TargetSummary label="Carbs" value={form.carbs} unit="g" /><TargetSummary label="Fat" value={form.fat} unit="g" /></div></div>
         <div className="rounded-[24px] border border-border bg-card p-5"><p className="font-mono-ui text-[10px] uppercase tracking-[.18em] text-muted-foreground">Data backup</p><p className="mt-2 text-xs text-muted-foreground">Export your meals and workouts as a JSON file, or import a previous backup.</p><div className="mt-4 flex gap-2"><button type="button" onClick={handleExport} data-testid="button-export-data" className="focus-ring inline-flex h-10 items-center gap-2 rounded-xl border border-border bg-card px-4 text-xs font-bold transition hover:bg-muted"><Download size={14} /> Export</button><button type="button" onClick={handleImport} data-testid="button-import-data" className="focus-ring inline-flex h-10 items-center gap-2 rounded-xl border border-border bg-card px-4 text-xs font-bold transition hover:bg-muted"><Upload size={14} /> Import</button></div></div>

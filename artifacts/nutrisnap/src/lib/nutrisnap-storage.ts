@@ -1,5 +1,6 @@
 import { z } from 'zod';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import * as api from './api';
 
 // ── Zod schemas for runtime validation ──────────────────────────────────────
 
@@ -66,13 +67,7 @@ export type Workout = z.infer<typeof workoutSchema>;
 
 export type Goals = z.infer<typeof goalsSchema>;
 
-// ── Storage helpers ─────────────────────────────────────────────────────────
-
-const STORAGE_KEYS = {
-  meals: 'nutrisnap:meals',
-  workouts: 'nutrisnap:workouts',
-  goals: 'nutrisnap:goals',
-} as const;
+// ── Defaults ───────────────────────────────────────────────────────────────
 
 export const defaultGoals: Goals = {
   calories: 2100,
@@ -80,50 +75,6 @@ export const defaultGoals: Goals = {
   carbs: 230,
   fat: 70,
 };
-
-function readStorage<T>(key: string, fallback: T, schema?: z.ZodType<T>): T {
-  if (typeof window === 'undefined') return fallback;
-  try {
-    const value = window.localStorage.getItem(key);
-    if (!value) return fallback;
-    const parsed: unknown = JSON.parse(value);
-    if (schema) {
-      const result = schema.safeParse(parsed);
-      return result.success ? result.data : fallback;
-    }
-    return parsed as T;
-  } catch {
-    return fallback;
-  }
-}
-
-function writeStorage<T>(key: string, value: T): boolean {
-  if (typeof window === 'undefined') return false;
-  try {
-    window.localStorage.setItem(key, JSON.stringify(value));
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-function uid(prefix: string) {
-  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-}
-
-// ── Quota monitoring ────────────────────────────────────────────────────────
-
-export type StorageQuota = { usage: number; quota: number; percent: number } | null;
-
-async function getStorageQuota(): Promise<StorageQuota> {
-  if (typeof navigator === 'undefined' || !navigator.storage?.estimate) return null;
-  try {
-    const { usage = 0, quota = 0 } = await navigator.storage.estimate();
-    return { usage, quota, percent: quota > 0 ? Math.round((usage / quota) * 100) : 0 };
-  } catch {
-    return null;
-  }
-}
 
 // ── Data export / import ────────────────────────────────────────────────────
 
@@ -176,89 +127,69 @@ export function useNutriSnap() {
   const [workouts, setWorkouts] = useState<Workout[]>([]);
   const [goals, setGoals] = useState<Goals>(defaultGoals);
   const [ready, setReady] = useState(false);
-  const [storageWarning, setStorageWarning] = useState<StorageQuota>(null);
-  const saveCountRef = useRef(0);
 
   useEffect(() => {
-    setMeals(readStorage<Meal[]>(STORAGE_KEYS.meals, [], z.array(mealSchema)));
-    const storedWorkouts = readStorage<Workout[]>(STORAGE_KEYS.workouts, [], z.array(workoutSchema));
-    const normalizedWorkouts = storedWorkouts.map((workout) => ({
-      ...workout,
-      targetAreas: Array.isArray(workout.targetAreas) ? workout.targetAreas : [],
-    }));
-    setWorkouts(normalizedWorkouts);
-    writeStorage(STORAGE_KEYS.workouts, normalizedWorkouts);
-    setGoals(readStorage<Goals>(STORAGE_KEYS.goals, defaultGoals, goalsSchema));
-    setReady(true);
-
-    getStorageQuota().then((quota) => {
-      if (quota && quota.percent > 80) setStorageWarning(quota);
-    });
+    Promise.all([api.getMeals(), api.getWorkouts(), api.getGoals()])
+      .then(([mealsData, workoutsData, goalsData]) => {
+        const validatedMeals = z.array(mealSchema).safeParse(mealsData);
+        const validatedWorkouts = z.array(workoutSchema).safeParse(workoutsData);
+        const validatedGoals = goalsSchema.safeParse(goalsData);
+        setMeals(validatedMeals.success ? validatedMeals.data : []);
+        setWorkouts(validatedWorkouts.success ? validatedWorkouts.data : []);
+        setGoals(validatedGoals.success ? validatedGoals.data : defaultGoals);
+      })
+      .catch(() => {
+        setMeals([]);
+        setWorkouts([]);
+        setGoals(defaultGoals);
+      })
+      .finally(() => setReady(true));
   }, []);
 
-  const saveMeals = useCallback((next: Meal[]) => {
-    setMeals(next);
-    const ok = writeStorage(STORAGE_KEYS.meals, next);
-    if (!ok) {
-      setStorageWarning({ usage: 0, quota: 0, percent: 100 });
-    }
-    saveCountRef.current++;
-    if (saveCountRef.current % 10 === 0) {
-      getStorageQuota().then((q) => { if (q && q.percent > 80) setStorageWarning(q); });
-    }
+  const addMeal = useCallback(async (meal: Omit<Meal, 'id'>) => {
+    const result = await api.createMeal(meal);
+    const newMeal = { ...meal, id: result.id };
+    setMeals((prev) => [newMeal, ...prev]);
+    return newMeal;
   }, []);
 
-  const saveWorkouts = useCallback((next: Workout[]) => {
-    setWorkouts(next);
-    const ok = writeStorage(STORAGE_KEYS.workouts, next);
-    if (!ok) {
-      setStorageWarning({ usage: 0, quota: 0, percent: 100 });
-    }
-    saveCountRef.current++;
-    if (saveCountRef.current % 10 === 0) {
-      getStorageQuota().then((q) => { if (q && q.percent > 80) setStorageWarning(q); });
-    }
+  const updateMeal = useCallback(async (id: string, patch: Omit<Meal, 'id'>) => {
+    await api.updateMeal(id, patch);
+    setMeals((prev) => prev.map((m) => m.id === id ? { ...patch, id } : m));
   }, []);
 
-  const saveGoals = useCallback((next: Goals) => {
+  const deleteMeal = useCallback(async (id: string) => {
+    await api.deleteMeal(id);
+    setMeals((prev) => prev.filter((m) => m.id !== id));
+  }, []);
+
+  const addWorkout = useCallback(async (workout: Omit<Workout, 'id'>) => {
+    const result = await api.createWorkout(workout);
+    const newWorkout = { ...workout, id: result.id };
+    setWorkouts((prev) => [newWorkout, ...prev]);
+    return newWorkout;
+  }, []);
+
+  const updateWorkout = useCallback(async (id: string, patch: Omit<Workout, 'id'>) => {
+    await api.updateWorkout(id, patch);
+    setWorkouts((prev) => prev.map((w) => w.id === id ? { ...patch, id } : w));
+  }, []);
+
+  const deleteWorkout = useCallback(async (id: string) => {
+    await api.deleteWorkout(id);
+    setWorkouts((prev) => prev.filter((w) => w.id !== id));
+  }, []);
+
+  const saveGoals = useCallback(async (next: Goals) => {
+    await api.updateGoals(next);
     setGoals(next);
-    writeStorage(STORAGE_KEYS.goals, next);
   }, []);
-
-  const addMeal = useCallback((meal: Omit<Meal, 'id'>) => {
-    const created = { ...meal, id: uid('meal') };
-    saveMeals([created, ...meals]);
-    return created;
-  }, [meals, saveMeals]);
-
-  const updateMeal = useCallback((id: string, patch: Omit<Meal, 'id'>) => {
-    saveMeals(meals.map((meal) => meal.id === id ? { ...patch, id } : meal));
-  }, [meals, saveMeals]);
-
-  const deleteMeal = useCallback((id: string) => {
-    saveMeals(meals.filter((meal) => meal.id !== id));
-  }, [meals, saveMeals]);
-
-  const addWorkout = useCallback((workout: Omit<Workout, 'id'>) => {
-    const created = { ...workout, id: uid('workout') };
-    saveWorkouts([created, ...workouts]);
-    return created;
-  }, [saveWorkouts, workouts]);
-
-  const updateWorkout = useCallback((id: string, patch: Omit<Workout, 'id'>) => {
-    saveWorkouts(workouts.map((workout) => workout.id === id ? { ...patch, id } : workout));
-  }, [saveWorkouts, workouts]);
-
-  const deleteWorkout = useCallback((id: string) => {
-    saveWorkouts(workouts.filter((workout) => workout.id !== id));
-  }, [saveWorkouts, workouts]);
 
   return {
     meals,
     workouts,
     goals,
     ready,
-    storageWarning,
     addMeal,
     updateMeal,
     deleteMeal,
