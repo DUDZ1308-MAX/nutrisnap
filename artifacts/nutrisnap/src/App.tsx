@@ -1,4 +1,4 @@
-import { Activity, ArrowRight, CalendarDays, ChevronRight, CircleAlert, Download, Flame, LogOut, Pencil, Plus, Search, Sparkles, Target, Trash2, TrendingUp, Upload, Utensils } from 'lucide-react';
+import { Activity, ArrowRight, CalendarDays, ChevronRight, CircleAlert, Download, Flame, Heart, LogOut, Pencil, Plus, Search, Sparkles, Target, Trash2, TrendingUp, Upload, Utensils } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { Link, Route, Router as WouterRouter, Switch, useLocation } from 'wouter';
 import { ErrorBoundary } from '@/components/error-boundary';
@@ -149,6 +149,8 @@ function Overview({ data, onAddMeal, onAddWorkout, onEditMeal, onEditWorkout }: 
         </section>
       </div>
 
+      <HealthRating totals={totals} goals={data.goals} todayMeals={todayMeals} todayWorkouts={todayWorkouts} />
+
       <section className="mt-5 rounded-[24px] border border-border bg-card p-5 shadow-sm sm:p-6">
         <div className="flex items-center justify-between"><div><p className="font-mono-ui text-[10px] uppercase tracking-[.2em] text-muted-foreground">Today’s plate</p><h2 className="mt-1 font-display text-2xl tracking-[-.04em]">Meals logged</h2></div><Link href="/meals" data-testid="link-view-all-meals" className="focus-ring inline-flex items-center gap-1 text-xs font-bold text-primary">View all <ArrowRight size={14} /></Link></div>
         {todayMeals.length ? <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{todayMeals.slice(0, 6).map((meal) => <MealRow key={meal.id} meal={meal} onEdit={() => onEditMeal(meal)} />)}</div> : <EmptyState title="Your plate is waiting" detail="Log your first meal to see the day take shape." actionLabel="Add a meal" onAction={() => onAddMeal('meal')} icon={<Utensils size={22} />} testId="dashboard-meals" />}
@@ -159,6 +161,63 @@ function Overview({ data, onAddMeal, onAddWorkout, onEditMeal, onEditWorkout }: 
 
 function ProgressLine({ label, value, goal, color, unit, testId }: { label: string; value: number; goal: number; color: string; unit: string; testId: string }) {
   return <div data-testid={testId}><div className="mb-1.5 flex items-center justify-between text-xs"><span className="font-bold">{label}</span><span className="font-mono-ui text-[11px] text-muted-foreground">{Math.round(value)}{unit} <span className="text-muted-foreground/60">/ {goal}{unit}</span></span></div><div className="h-2 overflow-hidden rounded-full bg-muted"><div className={`h-full rounded-full ${color} transition-all duration-500`} style={{ width: `${percentage(value, goal)}%` }} /></div></div>;
+}
+
+function HealthRating({ totals, goals, todayMeals, todayWorkouts }: { totals: { calories: number; protein: number; carbs: number; fat: number }; goals: Goals; todayMeals: Meal[]; todayWorkouts: Workout[] }) {
+  const score = useMemo(() => {
+    let s = 0;
+    if (goals.calories > 0) {
+      const ratio = totals.calories / goals.calories;
+      if (ratio >= 0.85 && ratio <= 1.15) s += 30;
+      else if (ratio >= 0.7 && ratio <= 1.3) s += 20;
+      else if (ratio > 0 && ratio <= 1.5) s += 10;
+    }
+    if (goals.protein > 0) {
+      const ratio = totals.protein / goals.protein;
+      if (ratio >= 0.9) s += 25;
+      else if (ratio >= 0.6) s += 15;
+      else if (ratio > 0) s += 5;
+    }
+    const totalMacroG = totals.protein + totals.carbs + totals.fat;
+    if (totalMacroG > 0) {
+      const proteinPct = totals.protein / totalMacroG;
+      if (proteinPct >= 0.2 && proteinPct <= 0.4) s += 20;
+      else if (proteinPct >= 0.1) s += 10;
+    }
+    if (todayMeals.length >= 2) s += 15;
+    else if (todayMeals.length === 1) s += 8;
+    if (todayWorkouts.length > 0) s += 10;
+    return Math.min(100, s);
+  }, [totals, goals, todayMeals.length, todayWorkouts.length]);
+
+  const rating = score >= 80 ? 'Excellent' : score >= 60 ? 'Good' : score >= 40 ? 'Fair' : 'Needs work';
+  const ratingColor = score >= 80 ? 'text-[#3f8d7b]' : score >= 60 ? 'text-[#5ba88c]' : score >= 40 ? 'text-[#e1ae38]' : 'text-[#df674f]';
+  const barColor = score >= 80 ? 'bg-[#3f8d7b]' : score >= 60 ? 'bg-[#5ba88c]' : score >= 40 ? 'bg-[#e1ae38]' : 'bg-[#df674f]';
+  const tips: string[] = [];
+  if (todayMeals.length === 0) tips.push('Log a meal to start tracking.');
+  if (totals.protein < goals.protein * 0.6) tips.push('Add more protein to hit your target.');
+  if (todayWorkouts.length === 0) tips.push('Add a movement session today.');
+  if (totals.calories < goals.calories * 0.5 && todayMeals.length > 0) tips.push('You are under your calorie target.');
+
+  return (
+    <section className="mt-5 rounded-[24px] border border-border bg-card p-5 shadow-sm sm:p-6" data-testid="section-health-rating">
+      <div className="flex items-start justify-between gap-4">
+        <div><p className="font-mono-ui text-[10px] uppercase tracking-[.2em] text-muted-foreground">Health rating</p><h2 className="mt-1 font-display text-2xl tracking-[-.04em]">How is your day looking?</h2></div>
+        <div className="grid size-10 place-items-center rounded-2xl bg-secondary text-primary"><Heart size={18} /></div>
+      </div>
+      <div className="mt-6 flex items-center gap-5">
+        <div className="relative grid size-20 shrink-0 place-items-center rounded-full" style={{ background: `conic-gradient(hsl(var(--primary)) ${score}%, hsl(var(--muted)) 0)` }}>
+          <div className="grid size-[64px] place-items-center rounded-full bg-card text-center"><p className="font-display text-xl">{score}</p></div>
+        </div>
+        <div>
+          <p className={`font-display text-3xl ${ratingColor}`}>{rating}</p>
+          <p className="mt-1 text-xs text-muted-foreground">{todayMeals.length} meal{todayMeals.length !== 1 ? 's' : ''} · {todayWorkouts.length} session{todayWorkouts.length !== 1 ? 's' : ''}</p>
+        </div>
+      </div>
+      <div className="mt-4 h-2 overflow-hidden rounded-full bg-muted"><div className={`h-full rounded-full ${barColor} transition-all duration-500`} style={{ width: `${score}%` }} /></div>
+      {tips.length > 0 && <div className="mt-5 space-y-2">{tips.map((tip) => <div key={tip} className="flex items-start gap-2 rounded-xl bg-secondary/60 px-3.5 py-2.5"><Sparkles size={14} className="mt-0.5 shrink-0 text-primary" /><p className="text-xs leading-relaxed text-muted-foreground">{tip}</p></div>)}</div>}
+    </section>
+  );
 }
 
 function EmptyMini({ icon, title, detail }: { icon: ReactNode; title: string; detail: string }) {
