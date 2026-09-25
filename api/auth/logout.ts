@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { clearAuthCookie } from "../lib";
+import { clearAuthCookie } from "../lib.js";
 
 export default async function handler(_req: VercelRequest, res: VercelResponse) {
   clearAuthCookie(res);

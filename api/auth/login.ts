@@ -1,8 +1,8 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { getDb, bcrypt, signToken, setAuthCookie } from "../lib";
-import { usersTable } from "../../lib/db/src/schema";
+import { getDb, bcrypt, signToken, setAuthCookie } from "../lib.js";
+import { usersTable } from "../../lib/db/src/schema/index.js";
 import { eq } from "drizzle-orm";
-import { loginSchema } from "../../lib/db/src/schema/users";
+import { loginSchema } from "../../lib/db/src/schema/users.js";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== "POST") {

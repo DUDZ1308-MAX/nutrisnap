@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { getDb, requireAuth, eq } from "../lib";
-import { goalsTable } from "../../lib/db/src/schema";
-import { goalsSchema } from "../../lib/db/src/schema/goals";
+import { getDb, requireAuth, eq } from "../lib.js";
+import { goalsTable } from "../../lib/db/src/schema/index.js";
+import { goalsSchema } from "../../lib/db/src/schema/goals.js";
 import crypto from "crypto";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {

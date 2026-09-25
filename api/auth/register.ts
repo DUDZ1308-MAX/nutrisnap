@@ -1,8 +1,8 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { getDb, bcrypt, signToken, setAuthCookie, requireAuth } from "../lib";
-import { usersTable, goalsTable } from "../../lib/db/src/schema";
+import { getDb, bcrypt, signToken, setAuthCookie, requireAuth } from "../lib.js";
+import { usersTable, goalsTable } from "../../lib/db/src/schema/index.js";
 import { eq } from "drizzle-orm";
-import { registerSchema } from "../../lib/db/src/schema/users";
+import { registerSchema } from "../../lib/db/src/schema/users.js";
 import crypto from "crypto";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
