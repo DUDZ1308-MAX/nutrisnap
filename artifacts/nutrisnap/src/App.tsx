@@ -4,6 +4,7 @@ import { Link, Route, Router as WouterRouter, Switch, useLocation } from 'wouter
 import { ErrorBoundary } from '@/components/error-boundary';
 import { NutriSnapShell } from '@/components/nutrisnap-shell';
 import { ConfirmDialog, MealDialog, WorkoutDialog } from '@/components/nutrisnap-dialogs';
+import { WorkoutVideoGuide } from '@/components/workout-video-guide';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { Toaster } from '@/components/ui/toaster';
@@ -178,6 +179,7 @@ function WorkoutsPage({ data, onAdd, onEdit }: WorkoutsPageProps) {
   return <div className="mx-auto max-w-[1180px] px-5 py-8 sm:px-8 lg:px-12 lg:py-12">
     <PageIntro eyebrow="Movement log" title="Move in your own way." detail="Log a session, choose the areas you worked, and see them highlighted on your movement map." actionLabel="Add workout" onAction={onAdd} testId="workouts" />
     <div className="mt-8 grid gap-3 sm:grid-cols-3"><SummaryTile label="Sessions" value={data.workouts.length} detail="all time" icon={<Activity size={17} />} testId="workout-summary-sessions" /><SummaryTile label="Minutes" value={totalMinutes} detail="all time" icon={<TrendingUp size={17} />} testId="workout-summary-minutes" /><SummaryTile label="Activities" value={new Set(data.workouts.map((workout) => workout.activity)).size} detail="different ways" icon={<Sparkles size={17} />} testId="workout-summary-activities" /></div>
+    <WorkoutVideoGuide />
     <div className="mt-8 flex items-center justify-between gap-3"><div><p className="font-mono-ui text-[10px] uppercase tracking-[.2em] text-muted-foreground">Your sessions</p><h2 className="mt-1 font-display text-2xl">A little momentum</h2></div><div className="flex max-w-[52%] gap-1 overflow-x-auto rounded-xl border border-border bg-card p-1">{activities.map((item) => <button key={item} type="button" onClick={() => setFilter(item)} data-testid={`button-filter-workouts-${item.toLowerCase()}`} className={`focus-ring whitespace-nowrap rounded-lg px-3 py-2 text-xs font-bold ${filter === item ? 'bg-sidebar text-sidebar-foreground' : 'text-muted-foreground hover:bg-muted'}`}>{item}</button>)}</div></div>
     {filtered.length ? <div className="mt-5 grid gap-3 md:grid-cols-2">{filtered.map((workout, index) => <WorkoutCard key={workout.id} workout={workout} index={index} onEdit={() => onEdit(workout)} onDelete={() => setDeleting(workout)} />)}</div> : <EmptyState title="No sessions here yet" detail="Your next workout does not have to be complicated." actionLabel="Log a workout" onAction={onAdd} icon={<Activity size={22} />} testId="workouts-list" />}
     {deleting ? <ConfirmDialog title={`Delete ${deleting.name}?`} detail="This movement log will be removed from this device. This cannot be undone." onClose={() => setDeleting(undefined)} onConfirm={() => { data.deleteWorkout(deleting.id); setDeleting(undefined); }} testId={`workout-${deleting.id}`} /> : null}
