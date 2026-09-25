@@ -21,6 +21,10 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.27.0",
+    "@types/bcryptjs": "^3.0.0",
+    "@types/cookie": "^1.0.0",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/node": "catalog:",
     "@vercel/node": "^15.0.0",
     "eslint": "^9.27.0",
     "eslint-plugin-react-hooks": "^5.2.0",
