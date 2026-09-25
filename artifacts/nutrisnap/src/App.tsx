@@ -98,6 +98,7 @@ type Data = ReturnType<typeof useNutriSnap>;
 type OverviewProps = { data: Data; onAddMeal: (type: 'meal') => void; onAddWorkout: (type: 'workout') => void; onEditMeal: (meal: Meal) => void; onEditWorkout: (workout: Workout) => void };
 
 function Overview({ data, onAddMeal, onAddWorkout, onEditMeal, onEditWorkout }: OverviewProps) {
+  const { user } = useAuth();
   const today = todayKey();
   const todayMeals = useMemo(() => data.meals.filter((meal) => meal.date === today).sort((a, b) => b.time.localeCompare(a.time)), [data.meals, today]);
   const todayWorkouts = useMemo(() => data.workouts.filter((workout) => workout.date === today), [data.workouts, today]);
@@ -110,7 +111,7 @@ function Overview({ data, onAddMeal, onAddWorkout, onEditMeal, onEditWorkout }: 
         <div className="absolute -bottom-28 right-28 size-64 rounded-full border-[1px] border-sidebar-primary/20" />
         <div className="relative max-w-2xl">
           <p className="font-mono-ui text-[10px] uppercase tracking-[.22em] text-sidebar-primary" data-testid="text-dashboard-eyebrow">Today · {formatDate(today)}</p>
-          <h1 className="mt-3 font-display text-4xl leading-[.98] tracking-[-.055em] sm:text-5xl" data-testid="text-dashboard-heading">Make room for<br /><span className="text-sidebar-primary">good energy.</span></h1>
+          <h1 className="mt-3 font-display text-4xl leading-[.98] tracking-[-.055em] sm:text-5xl" data-testid="text-dashboard-heading">{user ? `Hi, ${user.username}` : 'Make room for'}<br /><span className="text-sidebar-primary">{user ? 'good energy.' : 'Good energy.'}</span></h1>
           <p className="mt-5 max-w-md text-sm leading-relaxed text-sidebar-foreground/60" data-testid="text-dashboard-subtitle">{todayMeals.length || todayWorkouts.length ? 'A quick look at what is fueling your day so far.' : 'Your day is still unwritten. Start with one small check-in.'}</p>
           <div className="mt-7 flex flex-wrap gap-2.5">
             <button type="button" onClick={() => onAddMeal('meal')} data-testid="button-dashboard-add-meal" className="focus-ring inline-flex h-11 items-center gap-2 rounded-xl bg-sidebar-primary px-4 text-sm font-bold text-sidebar-primary-foreground transition hover:brightness-105"><Plus size={16} /> Log a meal</button>
