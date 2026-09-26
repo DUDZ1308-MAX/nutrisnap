@@ -270,11 +270,11 @@ export function WorkoutDialog({ workout, onClose, onSave }: WorkoutFormProps) {
           <Field label="Duration · min"><input type="number" min="0" max="9999" value={form.durationMinutes} onChange={(event) => set('durationMinutes', Number(event.target.value))} className={inputClass} data-testid="input-workout-duration" /></Field>
           <Field label="Calories burned"><input type="number" min="0" max="99999" value={form.caloriesBurned} onChange={(event) => set('caloriesBurned', Number(event.target.value))} className={inputClass} data-testid="input-workout-calories" /></Field>
           <Field label="Target areas" wide>
-            <div className="grid gap-3 rounded-2xl border border-border bg-muted/35 p-3 sm:grid-cols-[150px_minmax(0,1fr)] sm:items-center sm:p-4">
+            <div className="grid gap-3 rounded-2xl border border-border bg-muted/35 p-3 sm:grid-cols-[120px_minmax(0,1fr)] sm:items-center sm:p-3">
               <MuscleMap targets={form.targetAreas} compact />
               <div>
-                <p className="mb-2 text-xs leading-relaxed text-muted-foreground">Targets auto-fill based on activity. Toggle any you want.</p>
-                <div className="grid grid-cols-2 gap-2">
+                <p className="mb-2 text-[11px] leading-relaxed text-muted-foreground">Targets auto-fill based on activity.</p>
+                <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-2">
                   {workoutTargetAreas.map((target) => {
                     const selected = form.targetAreas.includes(target.id);
                     return (
@@ -284,7 +284,7 @@ export function WorkoutDialog({ workout, onClose, onSave }: WorkoutFormProps) {
                         aria-pressed={selected}
                         onClick={() => toggleTargetArea(target.id)}
                         data-testid={`button-toggle-target-${target.id}`}
-                        className={`focus-ring rounded-xl border px-2.5 py-2 text-left text-xs font-bold transition ${selected ? 'border-primary bg-primary text-primary-foreground' : 'border-border bg-card text-muted-foreground hover:border-primary/50 hover:text-foreground'}`}
+                        className={`focus-ring rounded-lg border px-2 py-1.5 text-left text-[11px] font-bold transition ${selected ? 'border-primary bg-primary text-primary-foreground' : 'border-border bg-card text-muted-foreground hover:border-primary/50 hover:text-foreground'}`}
                       >
                         {target.label}
                       </button>
@@ -294,7 +294,7 @@ export function WorkoutDialog({ workout, onClose, onSave }: WorkoutFormProps) {
               </div>
             </div>
           </Field>
-          <Field label="Notes" wide><textarea value={form.notes} onChange={(event) => set('notes', event.target.value)} maxLength={500} placeholder="How did it feel?" rows={3} className={`${inputClass} h-auto py-3`} data-testid="input-workout-notes" /></Field>
+          <Field label="Notes" wide><textarea value={form.notes} onChange={(event) => set('notes', event.target.value)} maxLength={500} placeholder="How did it feel?" rows={2} className={`${inputClass} h-auto py-2`} data-testid="input-workout-notes" /></Field>
         </div>
         {error ? <p className="text-sm font-semibold text-destructive" role="alert" data-testid="status-workout-form-error">{error}</p> : null}
         <div className="flex flex-col-reverse gap-2 pt-1 sm:flex-row sm:justify-end">
