@@ -48,13 +48,13 @@ function Modal({ title, eyebrow, onClose, children }: ModalProps) {
   }, []);
 
   return (
-    <div ref={overlayRef} className="fixed inset-0 z-50 overflow-y-auto bg-foreground/35 backdrop-blur-[3px]" role="dialog" aria-modal="true" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="flex min-h-full items-center justify-center p-3 sm:p-4">
-      <div className="w-full max-w-[620px] rounded-[20px] border border-border bg-card p-4 shadow-2xl sm:rounded-[26px] sm:p-7">
-        <div className="mb-6 flex items-start justify-between gap-4">
+    <div ref={overlayRef} className="fixed inset-0 z-50 overflow-y-auto bg-background sm:bg-foreground/35 sm:backdrop-blur-[3px]" role="dialog" aria-modal="true" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="flex min-h-full items-end sm:items-center sm:justify-center sm:p-4">
+      <div className="w-full rounded-t-[20px] bg-card p-4 shadow-2xl sm:max-w-[620px] sm:rounded-[26px] sm:p-7">
+        <div className="mb-4 flex items-start justify-between gap-4 sm:mb-6">
           <div>
             <p className="font-mono-ui text-[10px] uppercase tracking-[.2em] text-primary">{eyebrow}</p>
-            <h2 className="mt-1 font-display text-3xl tracking-[-.04em] text-card-foreground">{title}</h2>
+            <h2 className="mt-1 font-display text-2xl tracking-[-.04em] text-card-foreground sm:text-3xl">{title}</h2>
           </div>
           <button type="button" onClick={onClose} data-testid="button-close-dialog" className="focus-ring grid size-9 place-items-center rounded-full text-muted-foreground transition hover:bg-muted hover:text-foreground"><X size={18} /></button>
         </div>
