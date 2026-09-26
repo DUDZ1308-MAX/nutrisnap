@@ -29,7 +29,7 @@ const workoutSchema = z.object({
   durationMinutes: z.number().min(0).max(9999),
   caloriesBurned: z.number().min(0).max(99999),
   targetAreas: z.array(workoutTargetSchema),
-  notes: z.string().max(500).optional(),
+  notes: z.string().max(500).nullish(),
 });
 
 const goalsSchema = z.object({
@@ -131,11 +131,13 @@ export function useNutriSnap() {
         const validatedMeals = z.array(mealSchema).safeParse(mealsData);
         const validatedWorkouts = z.array(workoutSchema).safeParse(workoutsData);
         const validatedGoals = goalsSchema.safeParse(goalsData);
+        if (!validatedWorkouts.success) console.warn('Workout validation failed:', validatedWorkouts.error.issues);
         setMeals(validatedMeals.success ? validatedMeals.data : []);
         setWorkouts(validatedWorkouts.success ? validatedWorkouts.data : []);
         setGoals(validatedGoals.success ? validatedGoals.data : defaultGoals);
       })
-      .catch(() => {
+      .catch((err) => {
+        console.error('Failed to load data:', err);
         setMeals([]);
         setWorkouts([]);
         setGoals(defaultGoals);

@@ -13,6 +13,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       .where(eq(workoutsTable.userId, user.id));
     const workouts = rows.map((w) => ({
       ...w,
+      notes: w.notes ?? undefined,
       targetAreas: typeof w.targetAreas === "string" ? JSON.parse(w.targetAreas) : w.targetAreas,
     }));
     return res.status(200).json({ workouts });
