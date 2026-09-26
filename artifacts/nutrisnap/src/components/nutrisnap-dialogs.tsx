@@ -48,10 +48,9 @@ function Modal({ title, eyebrow, onClose, children }: ModalProps) {
   }, []);
 
   return (
-    <div ref={overlayRef} className="fixed inset-0 z-50 bg-background sm:bg-foreground/35 sm:backdrop-blur-[3px]" role="dialog" aria-modal="true" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="flex h-full flex-col overflow-y-auto sm:block sm:overflow-visible">
-      <div className="mx-auto w-full max-w-[620px] p-3 pt-6 sm:p-4 sm:pt-16">
-      <div className="mb-4 rounded-[16px] bg-card p-4 shadow-2xl sm:mb-0 sm:rounded-[26px] sm:p-7">
+    <div ref={overlayRef} className="fixed inset-0 z-50 overflow-y-auto bg-background sm:block sm:overflow-visible sm:bg-foreground/35 sm:backdrop-blur-[3px]" role="dialog" aria-modal="true" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="mx-auto w-full max-w-[620px] p-3 pt-6 sm:flex sm:min-h-full sm:items-start sm:justify-center sm:p-4 sm:pt-16">
+      <div className="rounded-[16px] bg-card p-4 shadow-2xl sm:w-full sm:rounded-[26px] sm:p-7">
         <div className="mb-4 flex items-start justify-between gap-4 sm:mb-6">
           <div>
             <p className="font-mono-ui text-[10px] uppercase tracking-[.2em] text-primary">{eyebrow}</p>
@@ -60,7 +59,6 @@ function Modal({ title, eyebrow, onClose, children }: ModalProps) {
           <button type="button" onClick={onClose} data-testid="button-close-dialog" className="focus-ring grid size-9 place-items-center rounded-full text-muted-foreground transition hover:bg-muted hover:text-foreground"><X size={18} /></button>
         </div>
         {children}
-      </div>
       </div>
       </div>
     </div>
@@ -220,7 +218,7 @@ export function MealDialog({ meal, onClose, onSave }: MealFormProps) {
           </div>
         </div>
         {error ? <p className="text-sm font-semibold text-destructive" role="alert" data-testid="status-meal-form-error">{error}</p> : null}
-        <div className="sticky bottom-0 flex flex-col-reverse gap-2 bg-card pb-1 pt-2 sm:static sm:bg-transparent sm:pb-0 sm:pt-1 sm:flex-row sm:justify-end">
+        <div className="flex flex-col-reverse gap-2 pt-1 sm:flex-row sm:justify-end">
           <button type="button" onClick={onClose} data-testid="button-cancel-meal" className="focus-ring h-11 rounded-xl px-4 text-sm font-bold text-muted-foreground transition hover:bg-muted hover:text-foreground">Cancel</button>
           <button type="submit" data-testid="button-save-meal" className="focus-ring inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-primary px-5 text-sm font-bold text-primary-foreground transition hover:brightness-105"><Check size={16} /> {meal ? 'Save changes' : 'Save meal'}</button>
         </div>
@@ -296,7 +294,7 @@ export function WorkoutDialog({ workout, onClose, onSave }: WorkoutFormProps) {
           </div>
         </Field>
         {error ? <p className="text-sm font-semibold text-destructive" role="alert" data-testid="status-workout-form-error">{error}</p> : null}
-        <div className="sticky bottom-0 flex flex-col-reverse gap-2 bg-card pb-1 pt-2 sm:static sm:bg-transparent sm:pb-0 sm:pt-1 sm:flex-row sm:justify-end">
+        <div className="flex flex-col-reverse gap-2 pt-1 sm:flex-row sm:justify-end">
           <button type="button" onClick={onClose} data-testid="button-cancel-workout" className="focus-ring h-10 rounded-xl px-4 text-sm font-bold text-muted-foreground transition hover:bg-muted hover:text-foreground">Cancel</button>
           <button type="submit" data-testid="button-save-workout" className="focus-ring inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-primary px-5 text-sm font-bold text-primary-foreground transition hover:brightness-105"><Check size={16} /> {workout ? 'Save changes' : 'Save workout'}</button>
         </div>
