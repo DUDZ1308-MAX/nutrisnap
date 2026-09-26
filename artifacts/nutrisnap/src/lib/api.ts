@@ -162,3 +162,30 @@ interface WeekSummaryResponse {
 export async function getWeekSummary() {
   return apiFetch<WeekSummaryResponse>('/api/goals?summary=week');
 }
+
+// ── Body Photos ─────────────────────────────────────────────────────────
+
+interface BodyPhoto {
+  id: string;
+  date: string;
+  weight?: number;
+  imageDataUrl?: string;
+  notes?: string;
+}
+
+interface BodyPhotosResponse {
+  photos: BodyPhoto[];
+}
+
+export async function getBodyPhotos() {
+  const data = await apiFetch<BodyPhotosResponse>('/api/body-photos');
+  return data.photos;
+}
+
+export async function createBodyPhoto(photo: { date: string; weight?: number; imageDataUrl: string; notes?: string }) {
+  return apiFetch<IdResponse>('/api/body-photos', { method: 'POST', body: JSON.stringify(photo) });
+}
+
+export async function deleteBodyPhoto(id: string) {
+  return apiFetch<OkResponse>(`/api/body-photos?id=${id}`, { method: 'DELETE' });
+}

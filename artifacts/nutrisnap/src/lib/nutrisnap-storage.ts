@@ -69,6 +69,8 @@ export type WaterEntry = { id: string; date: string; amountMl: number };
 
 export type SavedMeal = { id: string; name: string; mealType: string; calories: number; protein: number; carbs: number; fat: number };
 
+export type BodyPhoto = { id: string; date: string; weight?: number; imageDataUrl?: string; notes?: string };
+
 // ── Defaults ───────────────────────────────────────────────────────────────
 
 export const defaultGoals: Goals = {
@@ -132,13 +134,14 @@ export function useNutriSnap() {
   const [waterEntries, setWaterEntries] = useState<WaterEntry[]>([]);
   const [waterTotalMl, setWaterTotalMl] = useState(0);
   const [savedMeals, setSavedMeals] = useState<SavedMeal[]>([]);
+  const [bodyPhotos, setBodyPhotos] = useState<BodyPhoto[]>([]);
   const [ready, setReady] = useState(false);
 
   const today = todayKey();
 
   useEffect(() => {
-    Promise.all([api.getMeals(), api.getWorkouts(), api.getGoals(), api.getWater(today), api.getSavedMeals()])
-      .then(([mealsData, workoutsData, goalsData, waterData, savedMealsData]) => {
+    Promise.all([api.getMeals(), api.getWorkouts(), api.getGoals(), api.getWater(today), api.getSavedMeals(), api.getBodyPhotos()])
+      .then(([mealsData, workoutsData, goalsData, waterData, savedMealsData, bodyPhotosData]) => {
         const validatedMeals = z.array(mealSchema).safeParse(mealsData);
         const validatedWorkouts = z.array(workoutSchema).safeParse(workoutsData);
         const validatedGoals = goalsSchema.safeParse(goalsData);
@@ -149,6 +152,7 @@ export function useNutriSnap() {
         setWaterEntries(waterData.entries || []);
         setWaterTotalMl(waterData.totalMl || 0);
         setSavedMeals(savedMealsData || []);
+        setBodyPhotos(bodyPhotosData || []);
       })
       .catch((err) => {
         console.error('Failed to load data:', err);
@@ -158,6 +162,7 @@ export function useNutriSnap() {
         setWaterEntries([]);
         setWaterTotalMl(0);
         setSavedMeals([]);
+        setBodyPhotos([]);
       })
       .finally(() => setReady(true));
   }, []);
@@ -251,6 +256,18 @@ export function useNutriSnap() {
     setSavedMeals((prev) => prev.filter((m) => m.id !== id));
   }, []);
 
+  const addBodyPhoto = useCallback(async (photo: { date: string; weight?: number; imageDataUrl: string; notes?: string }) => {
+    const result = await api.createBodyPhoto(photo);
+    const newPhoto: BodyPhoto = { ...photo, id: result.id };
+    setBodyPhotos((prev) => [newPhoto, ...prev]);
+    return newPhoto;
+  }, []);
+
+  const deleteBodyPhoto = useCallback(async (id: string) => {
+    await api.deleteBodyPhoto(id);
+    setBodyPhotos((prev) => prev.filter((p) => p.id !== id));
+  }, []);
+
   return {
     meals,
     workouts,
@@ -258,6 +275,7 @@ export function useNutriSnap() {
     waterEntries,
     waterTotalMl,
     savedMeals,
+    bodyPhotos,
     ready,
     addMeal,
     updateMeal,
@@ -270,5 +288,7 @@ export function useNutriSnap() {
     deleteWater,
     addSavedMeal,
     deleteSavedMeal,
+    addBodyPhoto,
+    deleteBodyPhoto,
   };
 }

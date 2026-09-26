@@ -39,6 +39,7 @@ import { WaterTracker } from '@/components/water-tracker';
 import { WeeklySummary } from '@/components/weekly-summary';
 import { TrendChart } from '@/components/trend-chart';
 import { StreakBadge } from '@/components/streak-badge';
+import { BodyProgress } from '@/components/body-progress';
 
 const queryClient = new QueryClient();
 
@@ -182,6 +183,8 @@ function Overview({ data, onAddMeal, onAddWorkout, onEditMeal, onEditWorkout, on
       <HealthStats user={user} goals={data.goals} />
 
       <TrendChart meals={data.meals} workouts={data.workouts} />
+
+      <BodyProgress photos={data.bodyPhotos} userWeight={user?.weight} onAdd={data.addBodyPhoto} onDelete={data.deleteBodyPhoto} />
 
       <div className="mt-5 grid gap-5 sm:grid-cols-3">
         <WaterTracker totalMl={data.waterTotalMl} goalMl={data.goals.waterMl} entries={data.waterEntries} onAdd={(amountMl) => data.addWater(amountMl)} onRemove={(id) => data.deleteWater(id)} />

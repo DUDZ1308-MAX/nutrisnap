@@ -4,3 +4,4 @@ export * from "./workouts.js";
 export * from "./goals.js";
 export * from "./water-logs.js";
 export * from "./saved-meals.js";
+export * from "./body-photos.js";
