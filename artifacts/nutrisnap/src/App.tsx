@@ -1,6 +1,26 @@
-import { Activity, ArrowRight, CalendarDays, ChevronRight, CircleAlert, Download, Flame, Heart, LogOut, Pencil, Plus, Search, Sparkles, Target, Trash2, TrendingUp, Upload, Utensils } from 'lucide-react';
+import { Activity, ArrowRight, CalendarDays, ChevronRight, CircleAlert, Cloud, Download, Flame, Heart, LogOut, Pencil, Plus, Search, Sparkles, Target, Trash2, TrendingUp, Upload, Utensils } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { Link, Route, Router as WouterRouter, Switch, useLocation } from 'wouter';
+
+function useWeather() {
+  const [temp, setTemp] = useState<number | null>(null);
+  useEffect(() => {
+    if (!navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        try {
+          const { latitude: lat, longitude: lon } = pos.coords;
+          const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true`);
+          const data = await res.json();
+          if (data?.current_weather?.temperature != null) setTemp(Math.round(data.current_weather.temperature));
+        } catch { /* ignore */ }
+      },
+      () => { /* permission denied or error */ },
+      { timeout: 8000 },
+    );
+  }, []);
+  return temp;
+}
 import { ErrorBoundary } from '@/components/error-boundary';
 import { NutriSnapShell } from '@/components/nutrisnap-shell';
 import { ConfirmDialog, MealDialog, WorkoutDialog } from '@/components/nutrisnap-dialogs';
@@ -100,6 +120,7 @@ type OverviewProps = { data: Data; onAddMeal: (type: 'meal') => void; onAddWorko
 function Overview({ data, onAddMeal, onAddWorkout, onEditMeal, onEditWorkout }: OverviewProps) {
   const { user } = useAuth();
   const today = todayKey();
+  const temp = useWeather();
   const todayMeals = useMemo(() => data.meals.filter((meal) => meal.date === today).sort((a, b) => b.time.localeCompare(a.time)), [data.meals, today]);
   const todayWorkouts = useMemo(() => data.workouts.filter((workout) => workout.date === today), [data.workouts, today]);
   const totals = todayMeals.reduce((sum, meal) => ({ calories: sum.calories + meal.calories, protein: sum.protein + meal.protein, carbs: sum.carbs + meal.carbs, fat: sum.fat + meal.fat }), { calories: 0, protein: 0, carbs: 0, fat: 0 });
@@ -110,7 +131,7 @@ function Overview({ data, onAddMeal, onAddWorkout, onEditMeal, onEditWorkout }: 
         <div className="absolute -right-12 -top-20 size-72 rounded-full border-[24px] border-sidebar-primary/15" />
         <div className="absolute -bottom-28 right-28 size-64 rounded-full border-[1px] border-sidebar-primary/20" />
         <div className="relative max-w-2xl">
-          <p className="font-mono-ui text-[10px] uppercase tracking-[.22em] text-sidebar-primary" data-testid="text-dashboard-eyebrow">Today · {formatDate(today)}</p>
+          <p className="font-mono-ui text-[10px] uppercase tracking-[.22em] text-sidebar-primary" data-testid="text-dashboard-eyebrow">Today · {formatDate(today)}{temp != null ? <>{' '}· {temp}°C</> : null}</p>
           <h1 className="mt-2 font-display text-3xl leading-[.98] tracking-[-.055em] sm:mt-3 sm:text-5xl" data-testid="text-dashboard-heading">{user ? `Hi, ${user.username}` : 'Make room for'}<br /><span className="text-sidebar-primary">{user ? 'good energy.' : 'Good energy.'}</span></h1>
           <p className="mt-3 max-w-md text-sm leading-relaxed text-sidebar-foreground/60 sm:mt-5" data-testid="text-dashboard-subtitle">{todayMeals.length || todayWorkouts.length ? 'A quick look at what is fueling your day so far.' : 'Your day is still unwritten. Start with one small check-in.'}</p>
           <div className="mt-4 flex flex-wrap gap-2 sm:mt-7">
