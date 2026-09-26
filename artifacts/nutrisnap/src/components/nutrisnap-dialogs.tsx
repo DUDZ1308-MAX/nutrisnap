@@ -19,10 +19,6 @@ function Modal({ title, eyebrow, onClose, children }: ModalProps) {
     document.documentElement.scrollTop = 0;
     document.body.scrollTop = 0;
     window.scrollTo({ top: 0 });
-    document.body.style.position = 'fixed';
-    document.body.style.top = '0';
-    document.body.style.left = '0';
-    document.body.style.right = '0';
     document.body.style.overflow = 'hidden';
 
     const focusable = overlay.querySelectorAll<HTMLElement>(
@@ -46,18 +42,15 @@ function Modal({ title, eyebrow, onClose, children }: ModalProps) {
 
     return () => {
       overlay.removeEventListener('keydown', handleKeyDown);
-      document.body.style.position = '';
-      document.body.style.top = '';
-      document.body.style.left = '';
-      document.body.style.right = '';
       document.body.style.overflow = '';
       previous?.focus();
     };
   }, []);
 
   return (
-    <div ref={overlayRef} className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/35 p-3 backdrop-blur-[3px] sm:p-4" role="dialog" aria-modal="true" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="max-h-[95dvh] w-full max-w-[620px] overflow-y-auto rounded-[20px] border border-border bg-card p-4 shadow-2xl sm:rounded-[26px] sm:p-7">
+    <div ref={overlayRef} className="fixed inset-0 z-50 overflow-y-auto bg-foreground/35 backdrop-blur-[3px]" role="dialog" aria-modal="true" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="flex min-h-full items-center justify-center p-3 sm:p-4">
+      <div className="w-full max-w-[620px] rounded-[20px] border border-border bg-card p-4 shadow-2xl sm:rounded-[26px] sm:p-7">
         <div className="mb-6 flex items-start justify-between gap-4">
           <div>
             <p className="font-mono-ui text-[10px] uppercase tracking-[.2em] text-primary">{eyebrow}</p>
@@ -66,6 +59,7 @@ function Modal({ title, eyebrow, onClose, children }: ModalProps) {
           <button type="button" onClick={onClose} data-testid="button-close-dialog" className="focus-ring grid size-9 place-items-center rounded-full text-muted-foreground transition hover:bg-muted hover:text-foreground"><X size={18} /></button>
         </div>
         {children}
+      </div>
       </div>
     </div>
   );
