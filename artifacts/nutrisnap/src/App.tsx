@@ -105,33 +105,33 @@ function Overview({ data, onAddMeal, onAddWorkout, onEditMeal, onEditWorkout }: 
   const totals = todayMeals.reduce((sum, meal) => ({ calories: sum.calories + meal.calories, protein: sum.protein + meal.protein, carbs: sum.carbs + meal.carbs, fat: sum.fat + meal.fat }), { calories: 0, protein: 0, carbs: 0, fat: 0 });
   const caloriesLeft = Math.max(0, data.goals.calories - totals.calories);
   return (
-    <div className="mx-auto max-w-[1320px] px-5 py-8 sm:px-8 lg:px-12 lg:py-12">
-      <section className="relative overflow-hidden rounded-[30px] bg-sidebar px-6 py-8 text-sidebar-foreground shadow-[0_22px_55px_-28px_hsl(165_28%_15%/.6)] sm:px-9 sm:py-10 lg:px-12 lg:py-11">
+    <div className="mx-auto max-w-[1320px] px-4 py-5 sm:px-8 lg:px-12 lg:py-12">
+      <section className="relative overflow-hidden rounded-[24px] bg-sidebar px-5 py-5 text-sidebar-foreground shadow-[0_22px_55px_-28px_hsl(165_28%_15%/.6)] sm:rounded-[30px] sm:px-9 sm:py-10 lg:px-12 lg:py-11">
         <div className="absolute -right-12 -top-20 size-72 rounded-full border-[24px] border-sidebar-primary/15" />
         <div className="absolute -bottom-28 right-28 size-64 rounded-full border-[1px] border-sidebar-primary/20" />
         <div className="relative max-w-2xl">
           <p className="font-mono-ui text-[10px] uppercase tracking-[.22em] text-sidebar-primary" data-testid="text-dashboard-eyebrow">Today · {formatDate(today)}</p>
-          <h1 className="mt-3 font-display text-4xl leading-[.98] tracking-[-.055em] sm:text-5xl" data-testid="text-dashboard-heading">{user ? `Hi, ${user.username}` : 'Make room for'}<br /><span className="text-sidebar-primary">{user ? 'good energy.' : 'Good energy.'}</span></h1>
-          <p className="mt-5 max-w-md text-sm leading-relaxed text-sidebar-foreground/60" data-testid="text-dashboard-subtitle">{todayMeals.length || todayWorkouts.length ? 'A quick look at what is fueling your day so far.' : 'Your day is still unwritten. Start with one small check-in.'}</p>
-          <div className="mt-7 flex flex-wrap gap-2.5">
-            <button type="button" onClick={() => onAddMeal('meal')} data-testid="button-dashboard-add-meal" className="focus-ring inline-flex h-11 items-center gap-2 rounded-xl bg-sidebar-primary px-4 text-sm font-bold text-sidebar-primary-foreground transition hover:brightness-105"><Plus size={16} /> Log a meal</button>
-            <button type="button" onClick={() => onAddWorkout('workout')} data-testid="button-dashboard-add-workout" className="focus-ring inline-flex h-11 items-center gap-2 rounded-xl border border-sidebar-foreground/20 px-4 text-sm font-bold text-sidebar-foreground transition hover:bg-sidebar-foreground/10"><Activity size={16} /> Log movement</button>
+          <h1 className="mt-2 font-display text-3xl leading-[.98] tracking-[-.055em] sm:mt-3 sm:text-5xl" data-testid="text-dashboard-heading">{user ? `Hi, ${user.username}` : 'Make room for'}<br /><span className="text-sidebar-primary">{user ? 'good energy.' : 'Good energy.'}</span></h1>
+          <p className="mt-3 max-w-md text-sm leading-relaxed text-sidebar-foreground/60 sm:mt-5" data-testid="text-dashboard-subtitle">{todayMeals.length || todayWorkouts.length ? 'A quick look at what is fueling your day so far.' : 'Your day is still unwritten. Start with one small check-in.'}</p>
+          <div className="mt-4 flex flex-wrap gap-2 sm:mt-7">
+            <button type="button" onClick={() => onAddMeal('meal')} data-testid="button-dashboard-add-meal" className="focus-ring inline-flex h-10 items-center gap-2 rounded-xl bg-sidebar-primary px-4 text-sm font-bold text-sidebar-primary-foreground transition hover:brightness-105 sm:h-11"><Plus size={16} /> Log a meal</button>
+            <button type="button" onClick={() => onAddWorkout('workout')} data-testid="button-dashboard-add-workout" className="focus-ring inline-flex h-10 items-center gap-2 rounded-xl border border-sidebar-foreground/20 px-4 text-sm font-bold text-sidebar-foreground transition hover:bg-sidebar-foreground/10 sm:h-11"><Activity size={16} /> Log movement</button>
           </div>
         </div>
-        <div className="relative mt-10 grid max-w-2xl grid-cols-2 gap-3 border-t border-sidebar-foreground/10 pt-5 sm:mt-12 sm:grid-cols-4">
-          {[['Calories', totals.calories, 'kcal'], ['Protein', `${Math.round(totals.protein)}g`, 'of target'], ['Meals', todayMeals.length, 'logged'], ['Movement', todayWorkouts.length, 'sessions']].map(([label, value, suffix], index) => <div key={String(label)} className={`${index > 1 ? 'hidden sm:block' : ''}`}><p className="font-mono-ui text-[9px] uppercase tracking-[.16em] text-sidebar-foreground/45">{label}</p><p className="mt-1 font-display text-2xl text-sidebar-foreground">{value}</p><p className="text-[10px] text-sidebar-foreground/45">{suffix}</p></div>)}
+        <div className="relative mt-6 grid max-w-2xl grid-cols-2 gap-3 border-t border-sidebar-foreground/10 pt-4 sm:mt-12 sm:grid-cols-4 sm:pt-5">
+          {[['Calories', totals.calories, 'kcal'], ['Protein', `${Math.round(totals.protein)}g`, 'of target'], ['Meals', todayMeals.length, 'logged'], ['Movement', todayWorkouts.length, 'sessions']].map(([label, value, suffix], index) => <div key={String(label)} className={`${index > 1 ? 'hidden sm:block' : ''}`}><p className="font-mono-ui text-[9px] uppercase tracking-[.16em] text-sidebar-foreground/45">{label}</p><p className="mt-1 font-display text-xl text-sidebar-foreground sm:text-2xl">{value}</p><p className="text-[10px] text-sidebar-foreground/45">{suffix}</p></div>)}
         </div>
       </section>
 
-      <div className="mt-8 grid gap-5 xl:grid-cols-[1.22fr_.78fr]">
-        <section className="rounded-[24px] border border-border bg-card p-5 shadow-sm sm:p-6">
+      <div className="mt-5 grid gap-5 sm:mt-8 xl:grid-cols-[1.22fr_.78fr]">
+        <section className="rounded-[20px] border border-border bg-card p-4 shadow-sm sm:rounded-[24px] sm:p-6">
           <div className="flex items-start justify-between gap-4">
-            <div><p className="font-mono-ui text-[10px] uppercase tracking-[.2em] text-muted-foreground">Nutrition balance</p><h2 className="mt-1 font-display text-2xl tracking-[-.04em]">Your fuel, at a glance</h2></div>
+            <div><p className="font-mono-ui text-[10px] uppercase tracking-[.2em] text-muted-foreground">Nutrition balance</p><h2 className="mt-1 font-display text-xl tracking-[-.04em] sm:text-2xl">Your fuel, at a glance</h2></div>
             <Link href="/settings" data-testid="link-dashboard-targets" className="focus-ring inline-flex items-center gap-1 text-xs font-bold text-primary">Edit targets <ChevronRight size={14} /></Link>
           </div>
-          <div className="mt-7 grid gap-5 sm:grid-cols-[160px_1fr] sm:items-center">
-            <div className="relative mx-auto grid size-36 place-items-center rounded-full" style={{ background: `conic-gradient(hsl(var(--primary)) ${percentage(totals.calories, data.goals.calories)}%, hsl(var(--muted)) 0)` }} data-testid="chart-calorie-progress">
-              <div className="grid size-[116px] place-items-center rounded-full bg-card text-center"><div><p className="font-display text-3xl">{totals.calories}</p><p className="font-mono-ui text-[9px] uppercase tracking-[.12em] text-muted-foreground">of {data.goals.calories}</p></div></div>
+          <div className="mt-5 grid gap-5 sm:mt-7 sm:grid-cols-[160px_1fr] sm:items-center">
+            <div className="relative mx-auto grid size-28 place-items-center rounded-full sm:size-36" style={{ background: `conic-gradient(hsl(var(--primary)) ${percentage(totals.calories, data.goals.calories)}%, hsl(var(--muted)) 0)` }} data-testid="chart-calorie-progress">
+              <div className="grid size-[96px] place-items-center rounded-full bg-card text-center sm:size-[116px]"><div><p className="font-display text-2xl sm:text-3xl">{totals.calories}</p><p className="font-mono-ui text-[8px] uppercase tracking-[.12em] text-muted-foreground sm:text-[9px]">of {data.goals.calories}</p></div></div>
             </div>
             <div className="space-y-4">
               <ProgressLine label="Protein" value={totals.protein} goal={data.goals.protein} color="bg-[#3f8d7b]" unit="g" testId="progress-protein" />
@@ -142,8 +142,8 @@ function Overview({ data, onAddMeal, onAddWorkout, onEditMeal, onEditWorkout }: 
           <div className="mt-6 flex items-center justify-between rounded-xl bg-secondary/60 px-4 py-3"><span className="text-xs font-semibold text-muted-foreground">Remaining today</span><span className="font-mono-ui text-sm font-medium text-foreground" data-testid="text-calories-remaining">{caloriesLeft} kcal</span></div>
         </section>
 
-        <section className="rounded-[24px] border border-border bg-accent/45 p-5 sm:p-6">
-          <div className="flex items-start justify-between"><div><p className="font-mono-ui text-[10px] uppercase tracking-[.2em] text-muted-foreground">Movement</p><h2 className="mt-1 font-display text-2xl tracking-[-.04em]">Keep it moving</h2></div><div className="grid size-10 place-items-center rounded-2xl bg-card text-primary"><Flame size={18} /></div></div>
+        <section className="rounded-[20px] border border-border bg-accent/45 p-4 sm:rounded-[24px] sm:p-6">
+          <div className="flex items-start justify-between"><div><p className="font-mono-ui text-[10px] uppercase tracking-[.2em] text-muted-foreground">Movement</p><h2 className="mt-1 font-display text-xl tracking-[-.04em] sm:text-2xl">Keep it moving</h2></div><div className="grid size-9 place-items-center rounded-2xl bg-card text-primary sm:size-10"><Flame size={16} /></div></div>
           {todayWorkouts.length ? <div className="mt-6 space-y-3">{todayWorkouts.slice(0, 3).map((workout) => <MiniWorkout key={workout.id} workout={workout} onEdit={() => onEditWorkout(workout)} />)}</div> : <EmptyMini icon={<Activity size={17} />} title="No movement logged yet" detail="A walk around the block counts." />}
           <button type="button" onClick={() => onAddWorkout('workout')} data-testid="button-add-movement-card" className="focus-ring mt-6 flex w-full items-center justify-center gap-2 rounded-xl border border-foreground/15 bg-card/55 py-3 text-xs font-bold transition hover:bg-card"><Plus size={14} /> Add movement</button>
         </section>
@@ -202,7 +202,7 @@ function HealthRating({ totals, goals, todayMeals, todayWorkouts }: { totals: { 
   if (totals.calories < goals.calories * 0.5 && todayMeals.length > 0) tips.push('You are under your calorie target.');
 
   return (
-    <section className="mt-5 rounded-[24px] border border-border bg-card p-5 shadow-sm sm:p-6" data-testid="section-health-rating">
+    <section className="mt-5 rounded-[20px] border border-border bg-card p-4 shadow-sm sm:rounded-[24px] sm:p-6" data-testid="section-health-rating">
       <div className="flex items-start justify-between gap-4">
         <div><p className="font-mono-ui text-[10px] uppercase tracking-[.2em] text-muted-foreground">Health rating</p><h2 className="mt-1 font-display text-2xl tracking-[-.04em]">How is your day looking?</h2></div>
         <div className="grid size-10 place-items-center rounded-2xl bg-secondary text-primary"><Heart size={18} /></div>
