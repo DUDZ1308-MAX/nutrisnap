@@ -41,10 +41,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       fat: 70,
     });
 
-    const token = signToken({ id, email, username });
+    const token = signToken({ id, email, username, age: null, height: null, weight: null });
     setAuthCookie(res, token);
 
-    return res.status(201).json({ user: { id, email, username } });
+    return res.status(201).json({ user: { id, email, username, age: null, height: null, weight: null } });
   }
 
   res.setHeader("Allow", "GET, POST");

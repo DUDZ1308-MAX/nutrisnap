@@ -29,8 +29,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(401).json({ error: "Invalid email or password" });
   }
 
-  const token = signToken({ id: user.id, email: user.email, username: user.username });
+  const profile = { id: user.id, email: user.email, username: user.username, age: user.age ?? null, height: user.height ?? null, weight: user.weight ?? null };
+  const token = signToken(profile);
   setAuthCookie(res, token);
 
-  return res.status(200).json({ user: { id: user.id, email: user.email, username: user.username } });
+  return res.status(200).json({ user: profile });
 }

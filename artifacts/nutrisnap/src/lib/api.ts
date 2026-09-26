@@ -20,7 +20,7 @@ async function apiFetch<T = Record<string, unknown>>(path: string, options: Requ
 }
 
 interface AuthResponse {
-  user: { id: string; email: string; username: string };
+  user: { id: string; email: string; username: string; age: number | null; height: number | null; weight: number | null };
 }
 
 interface MealsResponse {
@@ -106,4 +106,8 @@ export async function getGoals() {
 
 export async function updateGoals(goals: Record<string, unknown>) {
   return apiFetch<OkResponse>('/api/goals', { method: 'PUT', body: JSON.stringify(goals) });
+}
+
+export async function updateProfile(age: number | null, height: number | null, weight: number | null) {
+  return apiFetch<AuthResponse>('/api/auth/me', { method: 'PUT', body: JSON.stringify({ age, height, weight }) });
 }

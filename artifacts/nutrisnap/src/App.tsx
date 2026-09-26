@@ -151,6 +151,8 @@ function Overview({ data, onAddMeal, onAddWorkout, onEditMeal, onEditWorkout }: 
 
       <HealthRating totals={totals} goals={data.goals} todayMeals={todayMeals} todayWorkouts={todayWorkouts} />
 
+      <HealthStats user={user} goals={data.goals} />
+
       <section className="mt-5 rounded-[24px] border border-border bg-card p-5 shadow-sm sm:p-6">
         <div className="flex items-center justify-between"><div><p className="font-mono-ui text-[10px] uppercase tracking-[.2em] text-muted-foreground">Today’s plate</p><h2 className="mt-1 font-display text-2xl tracking-[-.04em]">Meals logged</h2></div><Link href="/meals" data-testid="link-view-all-meals" className="focus-ring inline-flex items-center gap-1 text-xs font-bold text-primary">View all <ArrowRight size={14} /></Link></div>
         {todayMeals.length ? <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{todayMeals.slice(0, 6).map((meal) => <MealRow key={meal.id} meal={meal} onEdit={() => onEditMeal(meal)} />)}</div> : <EmptyState title="Your plate is waiting" detail="Log your first meal to see the day take shape." actionLabel="Add a meal" onAction={() => onAddMeal('meal')} icon={<Utensils size={22} />} testId="dashboard-meals" />}
@@ -216,6 +218,47 @@ function HealthRating({ totals, goals, todayMeals, todayWorkouts }: { totals: { 
       </div>
       <div className="mt-4 h-2 overflow-hidden rounded-full bg-muted"><div className={`h-full rounded-full ${barColor} transition-all duration-500`} style={{ width: `${score}%` }} /></div>
       {tips.length > 0 && <div className="mt-5 space-y-2">{tips.map((tip) => <div key={tip} className="flex items-start gap-2 rounded-xl bg-secondary/60 px-3.5 py-2.5"><Sparkles size={14} className="mt-0.5 shrink-0 text-primary" /><p className="text-xs leading-relaxed text-muted-foreground">{tip}</p></div>)}</div>}
+    </section>
+  );
+}
+
+function HealthStats({ user, goals }: { user: { age: number | null; height: number | null; weight: number | null } | null; goals: Goals }) {
+  const stats = useMemo(() => {
+    if (!user?.age || !user?.height || !user?.weight) return null;
+    const heightM = user.height / 100;
+    const bmi = user.weight / (heightM * heightM);
+    const bmiCategory = bmi < 18.5 ? 'Underweight' : bmi < 25 ? 'Normal' : bmi < 30 ? 'Overweight' : 'Obese';
+    const bmr = 10 * user.weight + 6.25 * user.height - 5 * user.age + 5;
+    const tdee = Math.round(bmr * 1.55);
+    return { bmi: Math.round(bmi * 10) / 10, bmiCategory, bmr: Math.round(bmr), tdee };
+  }, [user?.age, user?.height, user?.weight]);
+
+  if (!stats) {
+    return (
+      <section className="mt-5 rounded-[24px] border border-border bg-card p-5 shadow-sm sm:p-6" data-testid="section-health-stats">
+        <div className="flex items-start justify-between gap-4">
+          <div><p className="font-mono-ui text-[10px] uppercase tracking-[.2em] text-muted-foreground">Body stats</p><h2 className="mt-1 font-display text-2xl tracking-[-.04em]">Know your numbers</h2></div>
+          <div className="grid size-10 place-items-center rounded-2xl bg-secondary text-primary"><TrendingUp size={18} /></div>
+        </div>
+        <p className="mt-4 text-sm text-muted-foreground">Add your age, height, and weight in <Link href="/settings" className="font-bold text-primary underline">Settings</Link> to see BMI, BMR, and calorie estimates here.</p>
+      </section>
+    );
+  }
+
+  const bmiColor = stats.bmiCategory === 'Normal' ? 'text-[#3f8d7b]' : stats.bmiCategory === 'Underweight' ? 'text-[#e1ae38]' : 'text-[#df674f]';
+
+  return (
+    <section className="mt-5 rounded-[24px] border border-border bg-card p-5 shadow-sm sm:p-6" data-testid="section-health-stats">
+      <div className="flex items-start justify-between gap-4">
+        <div><p className="font-mono-ui text-[10px] uppercase tracking-[.2em] text-muted-foreground">Body stats</p><h2 className="mt-1 font-display text-2xl tracking-[-.04em]">Know your numbers</h2></div>
+        <div className="grid size-10 place-items-center rounded-2xl bg-secondary text-primary"><TrendingUp size={18} /></div>
+      </div>
+      <div className="mt-6 grid gap-4 sm:grid-cols-3">
+        <div className="rounded-2xl border border-border bg-background/55 p-4 text-center"><p className="font-mono-ui text-[9px] uppercase tracking-[.12em] text-muted-foreground">BMI</p><p className={`mt-1 font-display text-3xl ${bmiColor}`}>{stats.bmi}</p><p className="mt-0.5 text-xs text-muted-foreground">{stats.bmiCategory}</p></div>
+        <div className="rounded-2xl border border-border bg-background/55 p-4 text-center"><p className="font-mono-ui text-[9px] uppercase tracking-[.12em] text-muted-foreground">BMR</p><p className="mt-1 font-display text-3xl">{stats.bmr}</p><p className="mt-0.5 text-xs text-muted-foreground">kcal/day at rest</p></div>
+        <div className="rounded-2xl border border-border bg-background/55 p-4 text-center"><p className="font-mono-ui text-[9px] uppercase tracking-[.12em] text-muted-foreground">Est. TDEE</p><p className="mt-1 font-display text-3xl">{stats.tdee}</p><p className="mt-0.5 text-xs text-muted-foreground">kcal/day active</p></div>
+      </div>
+      <p className="mt-4 text-[11px] leading-relaxed text-muted-foreground">Calculated with Mifflin-St Jeor. Activity level set to moderate (1.55x). Adjust your targets in <Link href="/settings" className="font-bold text-primary underline">Settings</Link>.</p>
     </section>
   );
 }
@@ -297,11 +340,15 @@ function PageIntro({ eyebrow, title, detail, actionLabel, onAction, testId }: { 
 }
 
 function SettingsPage({ data }: { data: Data }) {
-  const { user, logout } = useAuth();
+  const { user, logout, updateProfile } = useAuth();
   const [form, setForm] = useState<Goals>(data.goals);
   const [saved, setSaved] = useState(false);
+  const [profileForm, setProfileForm] = useState({ age: user?.age ?? '', height: user?.height ?? '', weight: user?.weight ?? '' });
+  const [profileSaved, setProfileSaved] = useState(false);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const profileTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const set = (key: keyof Goals, value: string) => { setSaved(false); setForm((current) => ({ ...current, [key]: Number(value) || 0 })); };
+  const setProfile = (key: string, value: string) => { setProfileSaved(false); setProfileForm((current) => ({ ...current, [key]: value })); };
   const submit = (event: FormEvent) => {
     event.preventDefault();
     data.saveGoals(form);
@@ -309,7 +356,17 @@ function SettingsPage({ data }: { data: Data }) {
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
     timeoutRef.current = setTimeout(() => setSaved(false), 2400);
   };
-  useEffect(() => () => { if (timeoutRef.current) clearTimeout(timeoutRef.current); }, []);
+  const submitProfile = async (event: FormEvent) => {
+    event.preventDefault();
+    const age = profileForm.age !== '' ? Number(profileForm.age) : null;
+    const height = profileForm.height !== '' ? Number(profileForm.height) : null;
+    const weight = profileForm.weight !== '' ? Number(profileForm.weight) : null;
+    await updateProfile(age, height, weight);
+    setProfileSaved(true);
+    if (profileTimeoutRef.current) clearTimeout(profileTimeoutRef.current);
+    profileTimeoutRef.current = setTimeout(() => setProfileSaved(false), 2400);
+  };
+  useEffect(() => () => { if (timeoutRef.current) clearTimeout(timeoutRef.current); if (profileTimeoutRef.current) clearTimeout(profileTimeoutRef.current); }, []);
   const handleExport = useCallback(() => {
     downloadExport(exportData(data.meals, data.workouts, data.goals));
   }, [data.meals, data.workouts, data.goals]);
@@ -332,7 +389,10 @@ function SettingsPage({ data }: { data: Data }) {
   return <div className="mx-auto max-w-[960px] px-5 py-8 sm:px-8 lg:px-12 lg:py-12">
     <div className="max-w-xl"><p className="font-mono-ui text-[10px] uppercase tracking-[.22em] text-primary" data-testid="text-settings-eyebrow">Personal settings</p><h1 className="mt-2 font-display text-4xl leading-[.95] tracking-[-.055em] sm:text-5xl" data-testid="text-settings-heading">Targets that fit<br />your real life.</h1><p className="mt-4 text-sm leading-relaxed text-muted-foreground">Set the daily numbers you want to use as a helpful reference. They are not a score.</p></div>
     <div className="mt-9 grid gap-5 lg:grid-cols-[1fr_280px]">
-      <form onSubmit={submit} className="rounded-[24px] border border-border bg-card p-5 shadow-sm sm:p-7"><div className="flex items-start justify-between border-b border-border pb-5"><div><h2 className="font-display text-2xl">Daily nutrition targets</h2><p className="mt-1 text-xs text-muted-foreground">Adjust these whenever your needs change.</p></div><Target size={21} className="text-primary" /></div><div className="mt-6 space-y-5"><TargetInput label="Calories" unit="kcal" value={form.calories} onChange={(value) => set('calories', value)} testId="calories" /><TargetInput label="Protein" unit="g" value={form.protein} onChange={(value) => set('protein', value)} testId="protein" /><TargetInput label="Carbohydrates" unit="g" value={form.carbs} onChange={(value) => set('carbs', value)} testId="carbs" /><TargetInput label="Fat" unit="g" value={form.fat} onChange={(value) => set('fat', value)} testId="fat" /></div><div className="mt-7 flex flex-col items-stretch gap-3 border-t border-border pt-5 sm:flex-row sm:items-center sm:justify-between"><p className="text-xs text-muted-foreground">Saved to your account.</p><button type="submit" data-testid="button-save-goals" className="focus-ring inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-primary px-5 text-sm font-bold text-primary-foreground transition hover:brightness-105">{saved ? <><Sparkles size={15} /> Saved</> : 'Save targets'}</button></div></form>
+      <div className="space-y-5">
+        <form onSubmit={submitProfile} className="rounded-[24px] border border-border bg-card p-5 shadow-sm sm:p-7"><div className="flex items-start justify-between border-b border-border pb-5"><div><h2 className="font-display text-2xl">Your profile</h2><p className="mt-1 text-xs text-muted-foreground">Used for health calculations like BMI and calorie needs.</p></div><Heart size={21} className="text-primary" /></div><div className="mt-6 grid gap-5 sm:grid-cols-3"><label className="block"><span className="mb-1.5 block text-[11px] font-bold uppercase tracking-[.12em] text-muted-foreground">Age</span><input type="number" min="1" max="150" value={profileForm.age} onChange={(event) => setProfile('age', event.target.value)} placeholder="e.g. 28" className="focus-ring h-11 w-full rounded-xl border border-input bg-background px-3.5 text-sm text-foreground outline-none transition placeholder:text-muted-foreground/60 focus:border-primary focus:ring-2 focus:ring-primary/10" data-testid="input-profile-age" /></label><label className="block"><span className="mb-1.5 block text-[11px] font-bold uppercase tracking-[.12em] text-muted-foreground">Height · cm</span><input type="number" min="1" max="300" value={profileForm.height} onChange={(event) => setProfile('height', event.target.value)} placeholder="e.g. 175" className="focus-ring h-11 w-full rounded-xl border border-input bg-background px-3.5 text-sm text-foreground outline-none transition placeholder:text-muted-foreground/60 focus:border-primary focus:ring-2 focus:ring-primary/10" data-testid="input-profile-height" /></label><label className="block"><span className="mb-1.5 block text-[11px] font-bold uppercase tracking-[.12em] text-muted-foreground">Weight · kg</span><input type="number" min="1" max="500" value={profileForm.weight} onChange={(event) => setProfile('weight', event.target.value)} placeholder="e.g. 70" className="focus-ring h-11 w-full rounded-xl border border-input bg-background px-3.5 text-sm text-foreground outline-none transition placeholder:text-muted-foreground/60 focus:border-primary focus:ring-2 focus:ring-primary/10" data-testid="input-profile-weight" /></label></div><div className="mt-7 flex flex-col items-stretch gap-3 border-t border-border pt-5 sm:flex-row sm:items-center sm:justify-between"><p className="text-xs text-muted-foreground">Saved to your account.</p><button type="submit" data-testid="button-save-profile" className="focus-ring inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-primary px-5 text-sm font-bold text-primary-foreground transition hover:brightness-105">{profileSaved ? <><Sparkles size={15} /> Saved</> : 'Save profile'}</button></div></form>
+        <form onSubmit={submit} className="rounded-[24px] border border-border bg-card p-5 shadow-sm sm:p-7"><div className="flex items-start justify-between border-b border-border pb-5"><div><h2 className="font-display text-2xl">Daily nutrition targets</h2><p className="mt-1 text-xs text-muted-foreground">Adjust these whenever your needs change.</p></div><Target size={21} className="text-primary" /></div><div className="mt-6 space-y-5"><TargetInput label="Calories" unit="kcal" value={form.calories} onChange={(value) => set('calories', value)} testId="calories" /><TargetInput label="Protein" unit="g" value={form.protein} onChange={(value) => set('protein', value)} testId="protein" /><TargetInput label="Carbohydrates" unit="g" value={form.carbs} onChange={(value) => set('carbs', value)} testId="carbs" /><TargetInput label="Fat" unit="g" value={form.fat} onChange={(value) => set('fat', value)} testId="fat" /></div><div className="mt-7 flex flex-col items-stretch gap-3 border-t border-border pt-5 sm:flex-row sm:items-center sm:justify-between"><p className="text-xs text-muted-foreground">Saved to your account.</p><button type="submit" data-testid="button-save-goals" className="focus-ring inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-primary px-5 text-sm font-bold text-primary-foreground transition hover:brightness-105">{saved ? <><Sparkles size={15} /> Saved</> : 'Save targets'}</button></div></form>
+      </div>
       <div className="space-y-5">
         {user ? <div className="rounded-[24px] border border-border bg-card p-5"><p className="font-mono-ui text-[10px] uppercase tracking-[.18em] text-muted-foreground">Account</p><p className="mt-3 text-sm font-bold">{user.username}</p><p className="mt-1 text-xs text-muted-foreground">{user.email}</p><button type="button" onClick={logout} data-testid="button-logout" className="focus-ring mt-4 inline-flex h-10 items-center gap-2 rounded-xl border border-border bg-card px-4 text-xs font-bold transition hover:bg-muted"><LogOut size={14} /> Sign out</button></div> : null}
         <div className="rounded-[24px] bg-accent/55 p-5"><div className="flex items-center gap-2 text-primary"><CircleAlert size={16} /><span className="font-mono-ui text-[10px] uppercase tracking-[.18em]">A gentle note</span></div><p className="mt-4 font-display text-2xl leading-tight">Numbers are a map, not a grade.</p><p className="mt-3 text-xs leading-relaxed text-muted-foreground">Targets can give your choices a little shape. Listen to your body first.</p></div>

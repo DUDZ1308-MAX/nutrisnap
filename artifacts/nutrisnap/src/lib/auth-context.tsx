@@ -5,6 +5,9 @@ interface AuthUser {
   id: string;
   email: string;
   username: string;
+  age: number | null;
+  height: number | null;
+  weight: number | null;
 }
 
 interface AuthContextType {
@@ -13,6 +16,7 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, username: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
+  updateProfile: (age: number | null, height: number | null, weight: number | null) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -43,8 +47,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
   };
 
+  const updateProfile = async (age: number | null, height: number | null, weight: number | null) => {
+    const data = await api.updateProfile(age, height, weight);
+    setUser(data.user);
+  };
+
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout }}>
+    <AuthContext.Provider value={{ user, loading, login, register, logout, updateProfile }}>
       {children}
     </AuthContext.Provider>
   );

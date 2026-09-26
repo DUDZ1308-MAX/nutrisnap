@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, text, integer, timestamp } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -7,6 +7,9 @@ export const usersTable = pgTable("users", {
   email: text("email").notNull().unique(),
   username: text("username").notNull(),
   passwordHash: text("password_hash").notNull(),
+  age: integer("age"),
+  height: integer("height"),
+  weight: integer("weight"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 

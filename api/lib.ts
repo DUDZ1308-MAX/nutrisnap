@@ -25,16 +25,19 @@ export interface AuthUser {
   id: string;
   email: string;
   username: string;
+  age: number | null;
+  height: number | null;
+  weight: number | null;
 }
 
 export function signToken(user: AuthUser): string {
-  return jwt.sign({ sub: user.id, email: user.email, username: user.username }, JWT_SECRET, { expiresIn: "7d" });
+  return jwt.sign({ sub: user.id, email: user.email, username: user.username, age: user.age, height: user.height, weight: user.weight }, JWT_SECRET, { expiresIn: "7d" });
 }
 
 export function verifyToken(token: string): AuthUser | null {
   try {
-    const payload = jwt.verify(token, JWT_SECRET) as { sub: string; email: string; username: string };
-    return { id: payload.sub, email: payload.email, username: payload.username };
+    const payload = jwt.verify(token, JWT_SECRET) as { sub: string; email: string; username: string; age: number | null; height: number | null; weight: number | null };
+    return { id: payload.sub, email: payload.email, username: payload.username, age: payload.age ?? null, height: payload.height ?? null, weight: payload.weight ?? null };
   } catch {
     return null;
   }
