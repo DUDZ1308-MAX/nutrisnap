@@ -48,9 +48,10 @@ function Modal({ title, eyebrow, onClose, children }: ModalProps) {
   }, []);
 
   return (
-    <div ref={overlayRef} className="fixed inset-0 z-50 overflow-y-auto bg-background sm:bg-foreground/35 sm:backdrop-blur-[3px]" role="dialog" aria-modal="true" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+    <div ref={overlayRef} className="fixed inset-0 z-50 bg-background sm:bg-foreground/35 sm:backdrop-blur-[3px]" role="dialog" aria-modal="true" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="flex h-full flex-col overflow-y-auto sm:block sm:overflow-visible">
       <div className="mx-auto w-full max-w-[620px] p-3 pt-6 sm:p-4 sm:pt-16">
-      <div className="rounded-[16px] bg-card p-4 shadow-2xl sm:rounded-[26px] sm:p-7">
+      <div className="mb-4 rounded-[16px] bg-card p-4 shadow-2xl sm:mb-0 sm:rounded-[26px] sm:p-7">
         <div className="mb-4 flex items-start justify-between gap-4 sm:mb-6">
           <div>
             <p className="font-mono-ui text-[10px] uppercase tracking-[.2em] text-primary">{eyebrow}</p>
@@ -59,6 +60,7 @@ function Modal({ title, eyebrow, onClose, children }: ModalProps) {
           <button type="button" onClick={onClose} data-testid="button-close-dialog" className="focus-ring grid size-9 place-items-center rounded-full text-muted-foreground transition hover:bg-muted hover:text-foreground"><X size={18} /></button>
         </div>
         {children}
+      </div>
       </div>
       </div>
     </div>
@@ -176,8 +178,8 @@ export function MealDialog({ meal, onClose, onSave }: MealFormProps) {
 
   return (
     <Modal title={meal ? 'Edit meal' : 'Add a meal'} eyebrow="Manual nutrition log" onClose={onClose}>
-      <form onSubmit={submit} className="space-y-5">
-        <div className="grid gap-4 sm:grid-cols-2">
+      <form onSubmit={submit} className="space-y-3 sm:space-y-5">
+        <div className="grid gap-3 sm:grid-cols-2 sm:gap-4">
           <Field label="Meal name" wide>
             <input required autoFocus value={form.name} onChange={(event) => set('name', event.target.value)} maxLength={100} placeholder="e.g. 2 eggs, toast, and coffee" className={inputClass} data-testid="input-meal-name" />
           </Field>
@@ -186,18 +188,18 @@ export function MealDialog({ meal, onClose, onSave }: MealFormProps) {
           <Field label="Time"><input type="time" value={form.time} onChange={(event) => set('time', event.target.value)} className={inputClass} data-testid="input-meal-time" /></Field>
         </div>
 
-        <div className="rounded-2xl border border-border bg-background/70 p-4">
-          <div className="mb-3 flex items-center justify-between">
-            <div><p className="text-sm font-bold">Nutrition facts</p><p className="text-xs text-muted-foreground">Type your meal name above, then auto-fill or enter values manually.</p></div>
-            <span className="rounded-full bg-accent/35 px-2.5 py-1 font-mono-ui text-[10px] font-medium text-foreground">Manual entry</span>
+        <div className="rounded-2xl border border-border bg-background/70 p-3 sm:p-4">
+          <div className="mb-2 flex items-center justify-between sm:mb-3">
+            <div><p className="text-sm font-bold">Nutrition facts</p><p className="text-[11px] text-muted-foreground sm:text-xs">Auto-fill or enter manually.</p></div>
+            <span className="rounded-full bg-accent/35 px-2 py-0.5 font-mono-ui text-[10px] font-medium text-foreground">Manual</span>
           </div>
-          <div className="mb-3">
-            <button type="button" onClick={handleNutritionLookup} disabled={looking || !form.name.trim()} className="focus-ring w-full h-10 rounded-xl bg-primary px-4 text-sm font-bold text-primary-foreground transition hover:brightness-105 disabled:opacity-40 disabled:cursor-not-allowed" data-testid="button-nutrition-lookup">
-              {looking ? 'Looking up nutrition...' : 'Auto-fill nutrition from food name'}
+          <div className="mb-2 sm:mb-3">
+            <button type="button" onClick={handleNutritionLookup} disabled={looking || !form.name.trim()} className="focus-ring w-full h-9 rounded-xl bg-primary px-4 text-xs font-bold text-primary-foreground transition hover:brightness-105 disabled:opacity-40 disabled:cursor-not-allowed sm:h-10 sm:text-sm" data-testid="button-nutrition-lookup">
+              {looking ? 'Looking up...' : 'Auto-fill from food name'}
             </button>
           </div>
-          {lookupError ? <p className="mb-3 text-xs text-destructive" role="status">{lookupError}</p> : null}
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {lookupError ? <p className="mb-2 text-xs text-destructive" role="status">{lookupError}</p> : null}
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3">
             <Field label="Calories"><input type="number" min="0" max="99999" value={form.calories} onChange={(event) => set('calories', Number(event.target.value))} className={inputClass} data-testid="input-meal-calories" /></Field>
             <Field label="Protein · g"><input type="number" min="0" max="9999" value={form.protein} onChange={(event) => set('protein', Number(event.target.value))} className={inputClass} data-testid="input-meal-protein" /></Field>
             <Field label="Carbs · g"><input type="number" min="0" max="9999" value={form.carbs} onChange={(event) => set('carbs', Number(event.target.value))} className={inputClass} data-testid="input-meal-carbs" /></Field>
@@ -205,20 +207,20 @@ export function MealDialog({ meal, onClose, onSave }: MealFormProps) {
           </div>
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-[1fr_1.2fr]">
-          <label className="group relative flex min-h-[128px] cursor-pointer flex-col items-center justify-center overflow-hidden rounded-2xl border border-dashed border-primary/35 bg-secondary/45 p-4 text-center transition hover:border-primary hover:bg-secondary">
+        <div className="grid gap-3 sm:grid-cols-[1fr_1.2fr] sm:gap-4">
+          <label className="group relative flex min-h-[100px] cursor-pointer flex-col items-center justify-center overflow-hidden rounded-2xl border border-dashed border-primary/35 bg-secondary/45 p-3 text-center transition hover:border-primary hover:bg-secondary sm:min-h-[128px] sm:p-4">
             <input type="file" accept="image/*" onChange={handleFile} className="sr-only" data-testid="input-meal-photo" />
             {form.imageDataUrl ? <img src={form.imageDataUrl} alt="Meal preview" className="absolute inset-0 h-full w-full object-cover opacity-70" data-testid="img-meal-preview" /> : null}
-            <span className="relative grid size-9 place-items-center rounded-full bg-card text-primary shadow-sm"><ImagePlus size={18} /></span>
-            <span className="relative mt-2 text-xs font-bold">{form.imageDataUrl ? 'Replace photo' : 'Add a meal photo'}</span>
-            <span className="relative mt-1 text-[10px] text-muted-foreground">Optional · stored on this device</span>
+            <span className="relative grid size-8 place-items-center rounded-full bg-card text-primary shadow-sm sm:size-9"><ImagePlus size={16} /></span>
+            <span className="relative mt-1.5 text-[11px] font-bold sm:mt-2 sm:text-xs">{form.imageDataUrl ? 'Replace photo' : 'Add a meal photo'}</span>
+            <span className="relative mt-0.5 text-[10px] text-muted-foreground">Optional</span>
           </label>
-          <div className="rounded-2xl border border-border bg-muted/55 p-4">
+          <div className="hidden rounded-2xl border border-border bg-muted/55 p-4 sm:block">
             <div className="flex items-start gap-2.5"><Camera size={16} className="mt-0.5 shrink-0 text-primary" /><div><p className="text-sm font-bold">Photo analysis unavailable</p><p className="mt-1 text-xs leading-relaxed text-muted-foreground">NutriSnap does not identify food or estimate nutrition from photos. Add the facts manually above.</p></div></div>
           </div>
         </div>
         {error ? <p className="text-sm font-semibold text-destructive" role="alert" data-testid="status-meal-form-error">{error}</p> : null}
-        <div className="flex flex-col-reverse gap-2 pt-1 sm:flex-row sm:justify-end">
+        <div className="sticky bottom-0 flex flex-col-reverse gap-2 bg-card pb-1 pt-2 sm:static sm:bg-transparent sm:pb-0 sm:pt-1 sm:flex-row sm:justify-end">
           <button type="button" onClick={onClose} data-testid="button-cancel-meal" className="focus-ring h-11 rounded-xl px-4 text-sm font-bold text-muted-foreground transition hover:bg-muted hover:text-foreground">Cancel</button>
           <button type="submit" data-testid="button-save-meal" className="focus-ring inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-primary px-5 text-sm font-bold text-primary-foreground transition hover:brightness-105"><Check size={16} /> {meal ? 'Save changes' : 'Save meal'}</button>
         </div>
@@ -294,7 +296,7 @@ export function WorkoutDialog({ workout, onClose, onSave }: WorkoutFormProps) {
           </div>
         </Field>
         {error ? <p className="text-sm font-semibold text-destructive" role="alert" data-testid="status-workout-form-error">{error}</p> : null}
-        <div className="flex flex-col-reverse gap-2 pt-1 sm:flex-row sm:justify-end">
+        <div className="sticky bottom-0 flex flex-col-reverse gap-2 bg-card pb-1 pt-2 sm:static sm:bg-transparent sm:pb-0 sm:pt-1 sm:flex-row sm:justify-end">
           <button type="button" onClick={onClose} data-testid="button-cancel-workout" className="focus-ring h-10 rounded-xl px-4 text-sm font-bold text-muted-foreground transition hover:bg-muted hover:text-foreground">Cancel</button>
           <button type="submit" data-testid="button-save-workout" className="focus-ring inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-primary px-5 text-sm font-bold text-primary-foreground transition hover:brightness-105"><Check size={16} /> {workout ? 'Save changes' : 'Save workout'}</button>
         </div>
