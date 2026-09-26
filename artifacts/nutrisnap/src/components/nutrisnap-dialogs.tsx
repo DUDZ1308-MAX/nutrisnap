@@ -3,6 +3,7 @@ import { useEffect, useRef, useState, type ChangeEvent, type FormEvent, type Rea
 import type { Meal, MealType, Workout } from '@/lib/nutrisnap-storage';
 import { todayKey, workoutTargetAreas, type WorkoutTarget } from '@/lib/nutrisnap-storage';
 import { MuscleMap } from '@/components/muscle-map';
+import { useAuth } from '@/lib/auth-context';
 
 type ModalProps = { title: string; eyebrow: string; onClose: () => void; children: ReactNode };
 
@@ -93,19 +94,40 @@ const inputClass = 'focus-ring h-11 w-full rounded-xl border border-input bg-bac
 
 const activityTargetMap: Record<string, string[]> = {
   Strength: ['Chest', 'Back', 'Shoulders', 'Biceps', 'Triceps', 'Quads', 'Hamstrings', 'Glutes'],
-  Run: ['Quads', 'Hamstrings', 'Glutes', 'Calves'],
-  Walk: ['Quads', 'Hamstrings', 'Calves'],
-  Cycle: ['Quads', 'Hamstrings', 'Glutes', 'Calves'],
-  Yoga: ['Core', 'Shoulders', 'Quads', 'Hamstrings', 'Glutes'],
-  Swim: ['Chest', 'Back', 'Shoulders', 'Core'],
-  HIIT: ['Core', 'Quads', 'Glutes'],
-  Pilates: ['Core', 'Glutes', 'Hamstrings'],
-  Rowing: ['Back', 'Biceps', 'Glutes', 'Hamstrings'],
-  'Jump Rope': ['Calves', 'Quads', 'Core'],
-  Stretching: ['Hamstrings', 'Quads', 'Glutes', 'Shoulders'],
-  Dance: ['Quads', 'Glutes', 'Calves', 'Core'],
-  Other: [],
+  Run: ['Quads', 'Hamstrings', 'Calves', 'Glutes'],
+  Walk: ['Quads', 'Calves', 'Glutes'],
+  Cycle: ['Quads', 'Hamstrings', 'Calves', 'Glutes'],
+  Yoga: ['Core', 'Flexibility'],
+  Swim: ['Back', 'Shoulders', 'Core', 'Quads'],
+  HIIT: ['Quads', 'Hamstrings', 'Core', 'Glutes'],
+  Pilates: ['Core', 'Flexibility'],
+  Rowing: ['Back', 'Biceps', 'Quads', 'Core'],
+  'Jump Rope': ['Calves', 'Quads', 'Shoulders'],
+  Stretching: ['Flexibility'],
+  Dance: ['Quads', 'Glutes', 'Core'],
+  Other: ['Full Body'],
 };
+
+const activityMET: Record<string, number> = {
+  Strength: 6.0,
+  Run: 9.8,
+  Walk: 3.8,
+  Cycle: 7.5,
+  Yoga: 3.0,
+  Swim: 8.0,
+  HIIT: 8.0,
+  Pilates: 3.8,
+  Rowing: 7.0,
+  'Jump Rope': 12.3,
+  Stretching: 2.3,
+  Dance: 5.5,
+  Other: 5.0,
+};
+
+function calcCaloriesBurned(activity: string, durationMin: number, weightKg: number): number {
+  const met = activityMET[activity] ?? 5.0;
+  return Math.round(met * weightKg * (durationMin / 60));
+}
 
 type MealFormProps = {
   meal?: Meal;
@@ -250,12 +272,14 @@ export function MealDialog({ meal, onClose, onSave }: MealFormProps) {
 type WorkoutFormProps = { workout?: Workout; onClose: () => void; onSave: (workout: Omit<Workout, 'id'>) => void };
 
 export function WorkoutDialog({ workout, onClose, onSave }: WorkoutFormProps) {
+  const { user } = useAuth();
+  const weightKg = user?.weight ?? 70;
   const [form, setForm] = useState<Omit<Workout, 'id'>>({
     name: workout?.name ?? '',
     activity: workout?.activity ?? 'Strength',
     date: workout?.date ?? todayKey(),
     durationMinutes: workout?.durationMinutes ?? 30,
-    caloriesBurned: workout?.caloriesBurned ?? 0,
+    caloriesBurned: workout?.caloriesBurned ?? calcCaloriesBurned(workout?.activity ?? 'Strength', workout?.durationMinutes ?? 30, user?.weight ?? 70),
     targetAreas: workout?.targetAreas ?? [],
     notes: workout?.notes ?? '',
   });
@@ -272,6 +296,14 @@ export function WorkoutDialog({ workout, onClose, onSave }: WorkoutFormProps) {
       ...current,
       activity,
       targetAreas: activityTargetMap[activity] as WorkoutTarget[] ?? [],
+      caloriesBurned: calcCaloriesBurned(activity, current.durationMinutes, weightKg),
+    }));
+  };
+  const handleDurationChange = (duration: number) => {
+    setForm((current) => ({
+      ...current,
+      durationMinutes: duration,
+      caloriesBurned: calcCaloriesBurned(current.activity, duration, weightKg),
     }));
   };
   const submit = (event: FormEvent) => {
@@ -287,8 +319,8 @@ export function WorkoutDialog({ workout, onClose, onSave }: WorkoutFormProps) {
           <Field label="Workout name" wide><input required autoFocus value={form.name} onChange={(event) => set('name', event.target.value)} maxLength={100} placeholder="e.g. Lunch break lift" className={inputClass} data-testid="input-workout-name" /></Field>
           <Field label="Activity"><select value={form.activity} onChange={(event) => handleActivityChange(event.target.value)} className={inputClass} data-testid="select-workout-activity"><option>Strength</option><option>Run</option><option>Walk</option><option>Cycle</option><option>Yoga</option><option>Swim</option><option>HIIT</option><option>Pilates</option><option>Rowing</option><option>Jump Rope</option><option>Stretching</option><option>Dance</option><option>Other</option></select></Field>
           <Field label="Date"><input type="date" value={form.date} onChange={(event) => set('date', event.target.value)} className={inputClass} data-testid="input-workout-date" /></Field>
-          <Field label="Duration · min"><input type="number" min="0" max="9999" value={form.durationMinutes} onChange={(event) => set('durationMinutes', Number(event.target.value))} className={inputClass} data-testid="input-workout-duration" /></Field>
-          <Field label="Calories burned"><input type="number" min="0" max="99999" value={form.caloriesBurned} onChange={(event) => set('caloriesBurned', Number(event.target.value))} className={inputClass} data-testid="input-workout-calories" /></Field>
+          <Field label="Duration · min"><input type="number" min="0" max="9999" value={form.durationMinutes} onChange={(event) => handleDurationChange(Number(event.target.value))} className={inputClass} data-testid="input-workout-duration" /></Field>
+          <Field label="Calories burned (auto)"><input type="number" min="0" max="99999" value={form.caloriesBurned} onChange={(event) => set('caloriesBurned', Number(event.target.value))} className={inputClass} data-testid="input-workout-calories" /></Field>
           <Field label="Notes"><textarea value={form.notes} onChange={(event) => set('notes', event.target.value)} maxLength={500} placeholder="How did it feel?" rows={2} className={`${inputClass} h-auto py-2`} data-testid="input-workout-notes" /></Field>
         </div>
         <Field label="Target areas" wide>

@@ -1,6 +1,7 @@
 import { Activity, ArrowRight, CalendarDays, ChevronRight, CircleAlert, Cloud, Download, Flame, Heart, LogOut, Pencil, Plus, Search, Sparkles, Target, Trash2, TrendingUp, Upload, Utensils } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { Link, Route, Router as WouterRouter, Switch, useLocation } from 'wouter';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } from 'recharts';
 
 function useWeather() {
   const [temp, setTemp] = useState<number | null>(null);
@@ -178,7 +179,61 @@ function Overview({ data, onAddMeal, onAddWorkout, onEditMeal, onEditWorkout }: 
         <div className="flex items-center justify-between"><div><p className="font-mono-ui text-[10px] uppercase tracking-[.2em] text-muted-foreground">Today's plate</p><h2 className="mt-1 font-display text-xl tracking-[-.04em] sm:text-2xl">Meals logged</h2></div><Link href="/meals" data-testid="link-view-all-meals" className="focus-ring inline-flex items-center gap-1 text-xs font-bold text-primary">View all <ArrowRight size={14} /></Link></div>
         {todayMeals.length ? <div className="mt-4 grid gap-2 sm:mt-5 sm:grid-cols-2 sm:gap-3 lg:grid-cols-3">{todayMeals.slice(0, 6).map((meal) => <MealRow key={meal.id} meal={meal} onEdit={() => onEditMeal(meal)} />)}</div> : <EmptyState title="Your plate is waiting" detail="Log your first meal to see the day take shape." actionLabel="Add a meal" onAction={() => onAddMeal('meal')} icon={<Utensils size={22} />} testId="dashboard-meals" />}
       </section>
+
+      <HistoryChart meals={data.meals} workouts={data.workouts} />
     </div>
+  );
+}
+
+function HistoryChart({ meals, workouts }: { meals: Meal[]; workouts: Workout[] }) {
+  const chartData = useMemo(() => {
+    const days: { date: string; label: string; caloriesIn: number; caloriesOut: number }[] = [];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const key = d.toISOString().slice(0, 10);
+      const short = d.toLocaleDateString(undefined, { weekday: 'short' });
+      const dayMeals = meals.filter((m) => m.date === key);
+      const dayWorkouts = workouts.filter((w) => w.date === key);
+      days.push({
+        date: key,
+        label: short,
+        caloriesIn: dayMeals.reduce((s, m) => s + m.calories, 0),
+        caloriesOut: dayWorkouts.reduce((s, w) => s + w.caloriesBurned, 0),
+      });
+    }
+    return days;
+  }, [meals, workouts]);
+
+  const hasData = chartData.some((d) => d.caloriesIn > 0 || d.caloriesOut > 0);
+  if (!hasData) return null;
+
+  return (
+    <section className="mt-5 rounded-[20px] border border-border bg-card p-4 shadow-sm sm:rounded-[24px] sm:p-6">
+      <div className="mb-4"><p className="font-mono-ui text-[10px] uppercase tracking-[.2em] text-muted-foreground">Last 7 days</p><h2 className="mt-1 font-display text-xl tracking-[-.04em] sm:text-2xl">Activity history</h2></div>
+      <div className="h-[220px] w-full sm:h-[280px]">
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={chartData} barGap={2}>
+            <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+            <XAxis dataKey="label" tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} />
+            <YAxis tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} width={40} />
+            <Tooltip
+              contentStyle={{ borderRadius: 12, border: '1px solid hsl(var(--border))', background: 'hsl(var(--card))', fontSize: 12 }}
+              labelStyle={{ fontWeight: 700 }}
+              formatter={(value: number, name: string) => [`${value} kcal`, name === 'caloriesIn' ? 'Eaten' : 'Burned']}
+            />
+            <Legend
+              iconType="circle"
+              iconSize={8}
+              wrapperStyle={{ fontSize: 11 }}
+              formatter={(value: string) => value === 'caloriesIn' ? 'Eaten' : 'Burned'}
+            />
+            <Bar dataKey="caloriesIn" fill="hsl(var(--chart-2))" radius={[4, 4, 0, 0]} maxBarSize={32} />
+            <Bar dataKey="caloriesOut" fill="hsl(var(--chart-1))" radius={[4, 4, 0, 0]} maxBarSize={32} />
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+    </section>
   );
 }
 
