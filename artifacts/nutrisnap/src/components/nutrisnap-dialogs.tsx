@@ -16,6 +16,9 @@ function Modal({ title, eyebrow, onClose, children }: ModalProps) {
     const overlay = overlayRef.current;
     if (!overlay) return;
 
+    window.scrollTo(0, 0);
+    document.body.style.overflow = 'hidden';
+
     const focusable = overlay.querySelectorAll<HTMLElement>(
       'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
     );
@@ -37,13 +40,14 @@ function Modal({ title, eyebrow, onClose, children }: ModalProps) {
 
     return () => {
       overlay.removeEventListener('keydown', handleKeyDown);
+      document.body.style.overflow = '';
       previous?.focus();
     };
   }, []);
 
   return (
-    <div ref={overlayRef} className="fixed inset-0 z-50 grid place-items-center bg-foreground/35 p-4 backdrop-blur-[3px]" role="dialog" aria-modal="true" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="max-h-[92dvh] w-full max-w-[620px] overflow-y-auto rounded-[26px] border border-border bg-card p-5 shadow-2xl sm:p-7">
+    <div ref={overlayRef} className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/35 p-3 backdrop-blur-[3px] sm:p-4" role="dialog" aria-modal="true" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="max-h-[95dvh] w-full max-w-[620px] overflow-y-auto rounded-[20px] border border-border bg-card p-4 shadow-2xl sm:rounded-[26px] sm:p-7">
         <div className="mb-6 flex items-start justify-between gap-4">
           <div>
             <p className="font-mono-ui text-[10px] uppercase tracking-[.2em] text-primary">{eyebrow}</p>
