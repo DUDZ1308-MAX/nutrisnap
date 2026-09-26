@@ -48,10 +48,8 @@ function Modal({ title, eyebrow, onClose, children }: ModalProps) {
   }, []);
 
   return (
-    <div ref={overlayRef} className="fixed inset-0 z-50 bg-background sm:relative sm:z-50 sm:overflow-y-auto sm:bg-foreground/35 sm:backdrop-blur-[3px]" role="dialog" aria-modal="true" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="h-full overflow-y-scroll sm:h-auto sm:overflow-visible">
-      <div className="mx-auto w-full max-w-[620px] p-3 pt-6 sm:p-4 sm:pt-16">
-      <div className="rounded-[16px] bg-card p-4 shadow-2xl sm:rounded-[26px] sm:p-7">
+    <div ref={overlayRef} className="fixed inset-0 z-50 flex items-end bg-black/40 sm:items-center sm:justify-center sm:bg-black/40 sm:backdrop-blur-[3px]" role="dialog" aria-modal="true" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="max-h-[90dvh] w-full overflow-y-auto rounded-t-[20px] bg-card p-4 shadow-2xl sm:max-h-[85dvh] sm:max-w-[620px] sm:rounded-[26px] sm:p-7">
         <div className="mb-4 flex items-start justify-between gap-4 sm:mb-6">
           <div>
             <p className="font-mono-ui text-[10px] uppercase tracking-[.2em] text-primary">{eyebrow}</p>
@@ -60,8 +58,6 @@ function Modal({ title, eyebrow, onClose, children }: ModalProps) {
           <button type="button" onClick={onClose} data-testid="button-close-dialog" className="focus-ring grid size-9 place-items-center rounded-full text-muted-foreground transition hover:bg-muted hover:text-foreground"><X size={18} /></button>
         </div>
         {children}
-      </div>
-      </div>
       </div>
     </div>
   );
