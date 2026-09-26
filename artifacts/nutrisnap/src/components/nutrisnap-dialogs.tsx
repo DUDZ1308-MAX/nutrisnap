@@ -262,44 +262,41 @@ export function WorkoutDialog({ workout, onClose, onSave }: WorkoutFormProps) {
   };
   return (
     <Modal title={workout ? 'Edit workout' : 'Add a workout'} eyebrow="Movement log" onClose={onClose}>
-      <form onSubmit={submit} className="space-y-5">
-        <div className="grid gap-4 sm:grid-cols-2">
+      <form onSubmit={submit} className="space-y-3">
+        <div className="grid gap-3 sm:grid-cols-2">
           <Field label="Workout name" wide><input required autoFocus value={form.name} onChange={(event) => set('name', event.target.value)} maxLength={100} placeholder="e.g. Lunch break lift" className={inputClass} data-testid="input-workout-name" /></Field>
           <Field label="Activity"><select value={form.activity} onChange={(event) => handleActivityChange(event.target.value)} className={inputClass} data-testid="select-workout-activity"><option>Strength</option><option>Run</option><option>Walk</option><option>Cycle</option><option>Yoga</option><option>Swim</option><option>HIIT</option><option>Pilates</option><option>Rowing</option><option>Jump Rope</option><option>Stretching</option><option>Dance</option><option>Other</option></select></Field>
           <Field label="Date"><input type="date" value={form.date} onChange={(event) => set('date', event.target.value)} className={inputClass} data-testid="input-workout-date" /></Field>
           <Field label="Duration · min"><input type="number" min="0" max="9999" value={form.durationMinutes} onChange={(event) => set('durationMinutes', Number(event.target.value))} className={inputClass} data-testid="input-workout-duration" /></Field>
           <Field label="Calories burned"><input type="number" min="0" max="99999" value={form.caloriesBurned} onChange={(event) => set('caloriesBurned', Number(event.target.value))} className={inputClass} data-testid="input-workout-calories" /></Field>
-          <Field label="Target areas" wide>
-            <div className="grid gap-3 rounded-2xl border border-border bg-muted/35 p-3 sm:grid-cols-[120px_minmax(0,1fr)] sm:items-center sm:p-3">
-              <MuscleMap targets={form.targetAreas} compact />
-              <div>
-                <p className="mb-2 text-[11px] leading-relaxed text-muted-foreground">Targets auto-fill based on activity.</p>
-                <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-2">
-                  {workoutTargetAreas.map((target) => {
-                    const selected = form.targetAreas.includes(target.id);
-                    return (
-                      <button
-                        key={target.id}
-                        type="button"
-                        aria-pressed={selected}
-                        onClick={() => toggleTargetArea(target.id)}
-                        data-testid={`button-toggle-target-${target.id}`}
-                        className={`focus-ring rounded-lg border px-2 py-1.5 text-left text-[11px] font-bold transition ${selected ? 'border-primary bg-primary text-primary-foreground' : 'border-border bg-card text-muted-foreground hover:border-primary/50 hover:text-foreground'}`}
-                      >
-                        {target.label}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-          </Field>
-          <Field label="Notes" wide><textarea value={form.notes} onChange={(event) => set('notes', event.target.value)} maxLength={500} placeholder="How did it feel?" rows={2} className={`${inputClass} h-auto py-2`} data-testid="input-workout-notes" /></Field>
+          <Field label="Notes"><textarea value={form.notes} onChange={(event) => set('notes', event.target.value)} maxLength={500} placeholder="How did it feel?" rows={2} className={`${inputClass} h-auto py-2`} data-testid="input-workout-notes" /></Field>
         </div>
+        <Field label="Target areas" wide>
+          <div className="rounded-2xl border border-border bg-muted/35 p-3">
+            <p className="mb-2 text-[11px] text-muted-foreground">Targets auto-fill based on activity.</p>
+            <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-4 sm:gap-2">
+              {workoutTargetAreas.map((target) => {
+                const selected = form.targetAreas.includes(target.id);
+                return (
+                  <button
+                    key={target.id}
+                    type="button"
+                    aria-pressed={selected}
+                    onClick={() => toggleTargetArea(target.id)}
+                    data-testid={`button-toggle-target-${target.id}`}
+                    className={`focus-ring rounded-lg border px-2 py-1.5 text-left text-[11px] font-bold transition ${selected ? 'border-primary bg-primary text-primary-foreground' : 'border-border bg-card text-muted-foreground hover:border-primary/50 hover:text-foreground'}`}
+                  >
+                    {target.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </Field>
         {error ? <p className="text-sm font-semibold text-destructive" role="alert" data-testid="status-workout-form-error">{error}</p> : null}
         <div className="flex flex-col-reverse gap-2 pt-1 sm:flex-row sm:justify-end">
-          <button type="button" onClick={onClose} data-testid="button-cancel-workout" className="focus-ring h-11 rounded-xl px-4 text-sm font-bold text-muted-foreground transition hover:bg-muted hover:text-foreground">Cancel</button>
-          <button type="submit" data-testid="button-save-workout" className="focus-ring inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-primary px-5 text-sm font-bold text-primary-foreground transition hover:brightness-105"><Check size={16} /> {workout ? 'Save changes' : 'Save workout'}</button>
+          <button type="button" onClick={onClose} data-testid="button-cancel-workout" className="focus-ring h-10 rounded-xl px-4 text-sm font-bold text-muted-foreground transition hover:bg-muted hover:text-foreground">Cancel</button>
+          <button type="submit" data-testid="button-save-workout" className="focus-ring inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-primary px-5 text-sm font-bold text-primary-foreground transition hover:brightness-105"><Check size={16} /> {workout ? 'Save changes' : 'Save workout'}</button>
         </div>
       </form>
     </Modal>
