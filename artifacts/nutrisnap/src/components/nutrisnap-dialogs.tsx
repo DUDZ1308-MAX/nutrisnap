@@ -49,7 +49,7 @@ function Modal({ title, eyebrow, onClose, children }: ModalProps) {
 
   return (
     <div ref={overlayRef} className="fixed inset-0 z-50 overflow-y-auto bg-background sm:bg-foreground/35 sm:backdrop-blur-[3px]" role="dialog" aria-modal="true" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="mx-auto flex min-h-full w-full max-w-[620px] flex-col items-center justify-center p-4">
+      <div className="mx-auto flex min-h-full w-full max-w-[620px] flex-col items-center justify-end p-4 sm:justify-start sm:pt-8">
       <div className="w-full rounded-[20px] bg-card p-4 shadow-2xl sm:rounded-[26px] sm:p-7">
         <div className="mb-4 flex items-start justify-between gap-4 sm:mb-6">
           <div>
