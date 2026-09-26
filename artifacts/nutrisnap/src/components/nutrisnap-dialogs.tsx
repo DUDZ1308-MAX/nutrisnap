@@ -51,10 +51,10 @@ function Modal({ title, eyebrow, onClose, children }: ModalProps) {
 
   return (
     <>
-    {/* MOBILE: full-screen scrollable sheet */}
-    <div className="fixed inset-0 z-50 flex items-end overflow-y-auto bg-background sm:hidden" role="dialog" aria-modal="true" onClick={handleOverlayClick}>
-      <div className="min-h-full w-full p-3 pt-6">
-        <div className="rounded-[16px] bg-card p-4 shadow-2xl">
+    {/* MOBILE: full-screen sheet with card scrolling */}
+    <div className="fixed inset-0 z-50 bg-background sm:hidden" role="dialog" aria-modal="true" onClick={handleOverlayClick}>
+      <div className="mx-auto flex h-full w-full max-w-[620px] flex-col justify-end p-3">
+        <div className="max-h-[88vh] overflow-y-auto rounded-[16px] bg-card p-4 shadow-2xl">
           <div className="mb-4 flex items-start justify-between gap-4">
             <div>
               <p className="font-mono-ui text-[10px] uppercase tracking-[.2em] text-primary">{eyebrow}</p>
