@@ -37,6 +37,7 @@ const goalsSchema = z.object({
   protein: z.number().min(0).max(9999),
   carbs: z.number().min(0).max(9999),
   fat: z.number().min(0).max(9999),
+  waterMl: z.number().min(0).max(99999),
 });
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -64,6 +65,10 @@ export type Workout = z.infer<typeof workoutSchema>;
 
 export type Goals = z.infer<typeof goalsSchema>;
 
+export type WaterEntry = { id: string; date: string; amountMl: number };
+
+export type SavedMeal = { id: string; name: string; mealType: string; calories: number; protein: number; carbs: number; fat: number };
+
 // ── Defaults ───────────────────────────────────────────────────────────────
 
 export const defaultGoals: Goals = {
@@ -71,6 +76,7 @@ export const defaultGoals: Goals = {
   protein: 120,
   carbs: 230,
   fat: 70,
+  waterMl: 2500,
 };
 
 // ── Data export / import ────────────────────────────────────────────────────
@@ -123,11 +129,16 @@ export function useNutriSnap() {
   const [meals, setMeals] = useState<Meal[]>([]);
   const [workouts, setWorkouts] = useState<Workout[]>([]);
   const [goals, setGoals] = useState<Goals>(defaultGoals);
+  const [waterEntries, setWaterEntries] = useState<WaterEntry[]>([]);
+  const [waterTotalMl, setWaterTotalMl] = useState(0);
+  const [savedMeals, setSavedMeals] = useState<SavedMeal[]>([]);
   const [ready, setReady] = useState(false);
 
+  const today = todayKey();
+
   useEffect(() => {
-    Promise.all([api.getMeals(), api.getWorkouts(), api.getGoals()])
-      .then(([mealsData, workoutsData, goalsData]) => {
+    Promise.all([api.getMeals(), api.getWorkouts(), api.getGoals(), api.getWater(today), api.getSavedMeals()])
+      .then(([mealsData, workoutsData, goalsData, waterData, savedMealsData]) => {
         const validatedMeals = z.array(mealSchema).safeParse(mealsData);
         const validatedWorkouts = z.array(workoutSchema).safeParse(workoutsData);
         const validatedGoals = goalsSchema.safeParse(goalsData);
@@ -135,12 +146,18 @@ export function useNutriSnap() {
         setMeals(validatedMeals.success ? validatedMeals.data : []);
         setWorkouts(validatedWorkouts.success ? validatedWorkouts.data : []);
         setGoals(validatedGoals.success ? validatedGoals.data : defaultGoals);
+        setWaterEntries(waterData.entries || []);
+        setWaterTotalMl(waterData.totalMl || 0);
+        setSavedMeals(savedMealsData || []);
       })
       .catch((err) => {
         console.error('Failed to load data:', err);
         setMeals([]);
         setWorkouts([]);
         setGoals(defaultGoals);
+        setWaterEntries([]);
+        setWaterTotalMl(0);
+        setSavedMeals([]);
       })
       .finally(() => setReady(true));
   }, []);
@@ -204,10 +221,43 @@ export function useNutriSnap() {
     setGoals(next);
   }, []);
 
+  const addWater = useCallback(async (amountMl: number = 250) => {
+    const date = todayKey();
+    const result = await api.logWater(date, amountMl);
+    const newEntry: WaterEntry = { id: result.id, date, amountMl };
+    setWaterEntries((prev) => [...prev, newEntry]);
+    setWaterTotalMl((prev) => prev + amountMl);
+    return newEntry;
+  }, []);
+
+  const deleteWater = useCallback(async (id: string) => {
+    await api.deleteWater(id);
+    setWaterEntries((prev) => {
+      const entry = prev.find((e) => e.id === id);
+      if (entry) setWaterTotalMl((current) => Math.max(0, current - entry.amountMl));
+      return prev.filter((e) => e.id !== id);
+    });
+  }, []);
+
+  const addSavedMeal = useCallback(async (meal: Omit<SavedMeal, 'id'>) => {
+    const result = await api.createSavedMeal(meal);
+    const newSaved: SavedMeal = { ...meal, id: result.id };
+    setSavedMeals((prev) => [newSaved, ...prev]);
+    return newSaved;
+  }, []);
+
+  const deleteSavedMeal = useCallback(async (id: string) => {
+    await api.deleteSavedMeal(id);
+    setSavedMeals((prev) => prev.filter((m) => m.id !== id));
+  }, []);
+
   return {
     meals,
     workouts,
     goals,
+    waterEntries,
+    waterTotalMl,
+    savedMeals,
     ready,
     addMeal,
     updateMeal,
@@ -216,5 +266,9 @@ export function useNutriSnap() {
     updateWorkout,
     deleteWorkout,
     saveGoals,
+    addWater,
+    deleteWater,
+    addSavedMeal,
+    deleteSavedMeal,
   };
 }

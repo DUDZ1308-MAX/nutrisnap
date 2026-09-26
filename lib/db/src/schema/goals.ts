@@ -10,6 +10,7 @@ export const goalsTable = pgTable("goals", {
   protein: integer("protein").notNull().default(120),
   carbs: integer("carbs").notNull().default(230),
   fat: integer("fat").notNull().default(70),
+  waterMl: integer("water_ml").notNull().default(2500),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
@@ -24,6 +25,7 @@ export const goalsSchema = z.object({
   protein: z.number().min(0).max(9999),
   carbs: z.number().min(0).max(9999),
   fat: z.number().min(0).max(9999),
+  waterMl: z.number().min(0).max(99999),
 });
 
 export type InsertGoal = z.infer<typeof insertGoalSchema>;

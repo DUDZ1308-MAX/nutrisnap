@@ -32,7 +32,7 @@ interface WorkoutsResponse {
 }
 
 interface GoalsResponse {
-  goals: { calories: number; protein: number; carbs: number; fat: number };
+  goals: { calories: number; protein: number; carbs: number; fat: number; waterMl: number };
 }
 
 interface IdResponse {
@@ -110,4 +110,55 @@ export async function updateGoals(goals: Record<string, unknown>) {
 
 export async function updateProfile(age: number | null, height: number | null, weight: number | null) {
   return apiFetch<AuthResponse>('/api/auth/me', { method: 'PUT', body: JSON.stringify({ age, height, weight }) });
+}
+
+// ── Water ──────────────────────────────────────────────────────────────────
+
+interface WaterResponse {
+  entries: Array<{ id: string; date: string; amountMl: number }>;
+  totalMl: number;
+}
+
+export async function getWater(date: string) {
+  const data = await apiFetch<WaterResponse>(`/api/water?date=${date}`);
+  return data;
+}
+
+export async function logWater(date: string, amountMl: number) {
+  return apiFetch<IdResponse>('/api/water', { method: 'POST', body: JSON.stringify({ date, amountMl }) });
+}
+
+export async function deleteWater(id: string) {
+  return apiFetch<OkResponse>(`/api/water/${id}`, { method: 'DELETE' });
+}
+
+// ── Saved Meals ────────────────────────────────────────────────────────────
+
+interface SavedMealsResponse {
+  savedMeals: Array<{ id: string; name: string; mealType: string; calories: number; protein: number; carbs: number; fat: number }>;
+}
+
+export async function getSavedMeals() {
+  const data = await apiFetch<SavedMealsResponse>('/api/saved-meals');
+  return data.savedMeals;
+}
+
+export async function createSavedMeal(meal: Record<string, unknown>) {
+  return apiFetch<IdResponse>('/api/saved-meals', { method: 'POST', body: JSON.stringify(meal) });
+}
+
+export async function deleteSavedMeal(id: string) {
+  return apiFetch<OkResponse>(`/api/saved-meals/${id}`, { method: 'DELETE' });
+}
+
+// ── Weekly Summary ─────────────────────────────────────────────────────────
+
+interface WeekSummaryResponse {
+  days: Array<{ date: string; label: string; calories: number; protein: number; carbs: number; fat: number; workouts: number; durationMinutes: number; caloriesBurned: number; waterMl: number }>;
+  totals: { calories: number; protein: number; carbs: number; fat: number; workouts: number; durationMinutes: number; caloriesBurned: number; waterMl: number };
+  averages: { calories: number; protein: number; carbs: number; fat: number; workouts: number; waterMl: number };
+}
+
+export async function getWeekSummary() {
+  return apiFetch<WeekSummaryResponse>('/api/summary/week');
 }

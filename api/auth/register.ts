@@ -39,6 +39,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       protein: 120,
       carbs: 230,
       fat: 70,
+      waterMl: 2500,
     });
 
     const token = signToken({ id, email, username, age: null, height: null, weight: null });

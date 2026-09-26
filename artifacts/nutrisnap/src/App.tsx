@@ -35,6 +35,8 @@ import RegisterPage from '@/pages/register';
 import { AuthProvider, useAuth } from '@/lib/auth-context';
 import { todayKey, useNutriSnap, workoutTargetAreas, exportData, downloadExport, parseImport, type Goals, type Meal, type Workout } from '@/lib/nutrisnap-storage';
 import { MuscleMap } from '@/components/muscle-map';
+import { WaterTracker } from '@/components/water-tracker';
+import { WeeklySummary } from '@/components/weekly-summary';
 
 const queryClient = new QueryClient();
 
@@ -52,6 +54,7 @@ function AuthenticatedApp() {
   const [modal, setModal] = useState<'meal' | 'workout' | null>(null);
   const [editingMeal, setEditingMeal] = useState<Meal | undefined>();
   const [editingWorkout, setEditingWorkout] = useState<Workout | undefined>();
+  const [showWeeklySummary, setShowWeeklySummary] = useState(false);
   const data = useNutriSnap();
   const closeModal = () => { setModal(null); setEditingMeal(undefined); setEditingWorkout(undefined); };
   const shellAdd = (type: 'meal' | 'workout') => { setModal(type); setEditingMeal(undefined); setEditingWorkout(undefined); };
@@ -63,7 +66,7 @@ function AuthenticatedApp() {
       <RoutedErrorBoundary>
         <Switch>
           <Route path="/">
-            <Overview data={data} onAddMeal={shellAdd} onAddWorkout={shellAdd} onEditMeal={(meal) => { setEditingMeal(meal); setModal('meal'); }} onEditWorkout={(workout) => { setEditingWorkout(workout); setModal('workout'); }} />
+            <Overview data={data} onAddMeal={shellAdd} onAddWorkout={shellAdd} onEditMeal={(meal) => { setEditingMeal(meal); setModal('meal'); }} onEditWorkout={(workout) => { setEditingWorkout(workout); setModal('workout'); }} onShowWeeklySummary={() => setShowWeeklySummary(true)} />
           </Route>
           <Route path="/meals">
             <MealsPage data={data} onAdd={() => shellAdd('meal')} onEdit={(meal) => { setEditingMeal(meal); setModal('meal'); }} />
@@ -75,8 +78,9 @@ function AuthenticatedApp() {
           <Route component={NotFound} />
         </Switch>
       </RoutedErrorBoundary>
-      {modal === 'meal' ? <MealDialog meal={editingMeal} onClose={closeModal} onSave={async (meal) => { try { editingMeal ? await data.updateMeal(editingMeal.id, meal) : await data.addMeal(meal); closeModal(); } catch (err) { console.error('Failed to save meal:', err); } }} /> : null}
+      {modal === 'meal' ? <MealDialog meal={editingMeal} onClose={closeModal} onSave={async (meal) => { try { editingMeal ? await data.updateMeal(editingMeal.id, meal) : await data.addMeal(meal); closeModal(); } catch (err) { console.error('Failed to save meal:', err); } }} savedMeals={data.savedMeals} onSaveFavorite={async (meal) => { try { await data.addSavedMeal(meal); } catch (err) { console.error('Failed to save favorite:', err); } }} onDeleteSaved={async (id) => { try { await data.deleteSavedMeal(id); } catch (err) { console.error('Failed to delete saved meal:', err); } }} /> : null}
       {modal === 'workout' ? <WorkoutDialog workout={editingWorkout} onClose={closeModal} onSave={async (workout) => { try { editingWorkout ? await data.updateWorkout(editingWorkout.id, workout) : await data.addWorkout(workout); closeModal(); } catch (err) { console.error('Failed to save workout:', err); } }} /> : null}
+      {showWeeklySummary ? <WeeklySummary onClose={() => setShowWeeklySummary(false)} /> : null}
     </NutriSnapShell>
   );
 }
@@ -116,9 +120,9 @@ function LoadingScreen() {
 }
 
 type Data = ReturnType<typeof useNutriSnap>;
-type OverviewProps = { data: Data; onAddMeal: (type: 'meal') => void; onAddWorkout: (type: 'workout') => void; onEditMeal: (meal: Meal) => void; onEditWorkout: (workout: Workout) => void };
+type OverviewProps = { data: Data; onAddMeal: (type: 'meal') => void; onAddWorkout: (type: 'workout') => void; onEditMeal: (meal: Meal) => void; onEditWorkout: (workout: Workout) => void; onShowWeeklySummary: () => void };
 
-function Overview({ data, onAddMeal, onAddWorkout, onEditMeal, onEditWorkout }: OverviewProps) {
+function Overview({ data, onAddMeal, onAddWorkout, onEditMeal, onEditWorkout, onShowWeeklySummary }: OverviewProps) {
   const { user } = useAuth();
   const today = todayKey();
   const temp = useWeather();
@@ -174,6 +178,21 @@ function Overview({ data, onAddMeal, onAddWorkout, onEditMeal, onEditWorkout }: 
       <HealthRating totals={totals} goals={data.goals} todayMeals={todayMeals} todayWorkouts={todayWorkouts} />
 
       <HealthStats user={user} goals={data.goals} />
+
+      <div className="mt-5 grid gap-5 sm:grid-cols-2">
+        <WaterTracker totalMl={data.waterTotalMl} goalMl={data.goals.waterMl} entries={data.waterEntries} onAdd={(amountMl) => data.addWater(amountMl)} onRemove={(id) => data.deleteWater(id)} />
+
+        <section className="rounded-[20px] border border-border bg-card p-4 shadow-sm sm:rounded-[24px] sm:p-6">
+          <div className="flex items-start justify-between gap-4">
+            <div><p className="font-mono-ui text-[10px] uppercase tracking-[.2em] text-muted-foreground">Progress</p><h2 className="mt-1 font-display text-xl tracking-[-.04em] sm:text-2xl">Weekly overview</h2></div>
+            <div className="grid size-9 place-items-center rounded-2xl bg-[#e1ae38]/15 text-[#e1ae38] sm:size-10"><CalendarDays size={16} /></div>
+          </div>
+          <p className="mt-4 text-xs text-muted-foreground">See your averages and trends over the last 7 days.</p>
+          <button type="button" onClick={onShowWeeklySummary} data-testid="button-weekly-summary" className="focus-ring mt-5 flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3 text-xs font-bold text-primary-foreground transition hover:brightness-105">
+            <CalendarDays size={14} /> View weekly summary
+          </button>
+        </section>
+      </div>
 
       <section className="mt-5 rounded-[20px] border border-border bg-card p-4 shadow-sm sm:rounded-[24px] sm:p-6">
         <div className="flex items-center justify-between"><div><p className="font-mono-ui text-[10px] uppercase tracking-[.2em] text-muted-foreground">Today's plate</p><h2 className="mt-1 font-display text-xl tracking-[-.04em] sm:text-2xl">Meals logged</h2></div><Link href="/meals" data-testid="link-view-all-meals" className="focus-ring inline-flex items-center gap-1 text-xs font-bold text-primary">View all <ArrowRight size={14} /></Link></div>
@@ -467,12 +486,12 @@ function SettingsPage({ data }: { data: Data }) {
     <div className="mt-9 grid gap-5 lg:grid-cols-[1fr_280px]">
       <div className="space-y-5">
         <form onSubmit={submitProfile} className="rounded-[24px] border border-border bg-card p-5 shadow-sm sm:p-7"><div className="flex items-start justify-between border-b border-border pb-5"><div><h2 className="font-display text-2xl">Your profile</h2><p className="mt-1 text-xs text-muted-foreground">Used for health calculations like BMI and calorie needs.</p></div><Heart size={21} className="text-primary" /></div><div className="mt-6 grid gap-5 sm:grid-cols-3"><label className="block"><span className="mb-1.5 block text-[11px] font-bold uppercase tracking-[.12em] text-muted-foreground">Age</span><input type="number" min="1" max="150" value={profileForm.age} onChange={(event) => setProfile('age', event.target.value)} placeholder="e.g. 28" className="focus-ring h-11 w-full rounded-xl border border-input bg-background px-3.5 text-sm text-foreground outline-none transition placeholder:text-muted-foreground/60 focus:border-primary focus:ring-2 focus:ring-primary/10" data-testid="input-profile-age" /></label><label className="block"><span className="mb-1.5 block text-[11px] font-bold uppercase tracking-[.12em] text-muted-foreground">Height · cm</span><input type="number" min="1" max="300" value={profileForm.height} onChange={(event) => setProfile('height', event.target.value)} placeholder="e.g. 175" className="focus-ring h-11 w-full rounded-xl border border-input bg-background px-3.5 text-sm text-foreground outline-none transition placeholder:text-muted-foreground/60 focus:border-primary focus:ring-2 focus:ring-primary/10" data-testid="input-profile-height" /></label><label className="block"><span className="mb-1.5 block text-[11px] font-bold uppercase tracking-[.12em] text-muted-foreground">Weight · kg</span><input type="number" min="1" max="500" value={profileForm.weight} onChange={(event) => setProfile('weight', event.target.value)} placeholder="e.g. 70" className="focus-ring h-11 w-full rounded-xl border border-input bg-background px-3.5 text-sm text-foreground outline-none transition placeholder:text-muted-foreground/60 focus:border-primary focus:ring-2 focus:ring-primary/10" data-testid="input-profile-weight" /></label></div><div className="mt-7 flex flex-col items-stretch gap-3 border-t border-border pt-5 sm:flex-row sm:items-center sm:justify-between"><p className="text-xs text-muted-foreground">Saved to your account.</p><button type="submit" data-testid="button-save-profile" className="focus-ring inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-primary px-5 text-sm font-bold text-primary-foreground transition hover:brightness-105">{profileSaved ? <><Sparkles size={15} /> Saved</> : 'Save profile'}</button></div></form>
-        <form onSubmit={submit} className="rounded-[24px] border border-border bg-card p-5 shadow-sm sm:p-7"><div className="flex items-start justify-between border-b border-border pb-5"><div><h2 className="font-display text-2xl">Daily nutrition targets</h2><p className="mt-1 text-xs text-muted-foreground">Adjust these whenever your needs change.</p></div><Target size={21} className="text-primary" /></div><div className="mt-6 space-y-5"><TargetInput label="Calories" unit="kcal" value={form.calories} onChange={(value) => set('calories', value)} testId="calories" /><TargetInput label="Protein" unit="g" value={form.protein} onChange={(value) => set('protein', value)} testId="protein" /><TargetInput label="Carbohydrates" unit="g" value={form.carbs} onChange={(value) => set('carbs', value)} testId="carbs" /><TargetInput label="Fat" unit="g" value={form.fat} onChange={(value) => set('fat', value)} testId="fat" /></div><div className="mt-7 flex flex-col items-stretch gap-3 border-t border-border pt-5 sm:flex-row sm:items-center sm:justify-between"><p className="text-xs text-muted-foreground">Saved to your account.</p><button type="submit" data-testid="button-save-goals" className="focus-ring inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-primary px-5 text-sm font-bold text-primary-foreground transition hover:brightness-105">{saved ? <><Sparkles size={15} /> Saved</> : 'Save targets'}</button></div></form>
+        <form onSubmit={submit} className="rounded-[24px] border border-border bg-card p-5 shadow-sm sm:p-7"><div className="flex items-start justify-between border-b border-border pb-5"><div><h2 className="font-display text-2xl">Daily nutrition targets</h2><p className="mt-1 text-xs text-muted-foreground">Adjust these whenever your needs change.</p></div><Target size={21} className="text-primary" /></div><div className="mt-6 space-y-5"><TargetInput label="Calories" unit="kcal" value={form.calories} onChange={(value) => set('calories', value)} testId="calories" /><TargetInput label="Protein" unit="g" value={form.protein} onChange={(value) => set('protein', value)} testId="protein" /><TargetInput label="Carbohydrates" unit="g" value={form.carbs} onChange={(value) => set('carbs', value)} testId="carbs" /><TargetInput label="Fat" unit="g" value={form.fat} onChange={(value) => set('fat', value)} testId="fat" /><TargetInput label="Water" unit="ml" value={form.waterMl} onChange={(value) => set('waterMl', value)} testId="water" /></div><div className="mt-7 flex flex-col items-stretch gap-3 border-t border-border pt-5 sm:flex-row sm:items-center sm:justify-between"><p className="text-xs text-muted-foreground">Saved to your account.</p><button type="submit" data-testid="button-save-goals" className="focus-ring inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-primary px-5 text-sm font-bold text-primary-foreground transition hover:brightness-105">{saved ? <><Sparkles size={15} /> Saved</> : 'Save targets'}</button></div></form>
       </div>
       <div className="space-y-5">
         {user ? <div className="rounded-[24px] border border-border bg-card p-5"><p className="font-mono-ui text-[10px] uppercase tracking-[.18em] text-muted-foreground">Account</p><p className="mt-3 text-sm font-bold">{user.username}</p><p className="mt-1 text-xs text-muted-foreground">{user.email}</p><button type="button" onClick={logout} data-testid="button-logout" className="focus-ring mt-4 inline-flex h-10 items-center gap-2 rounded-xl border border-border bg-card px-4 text-xs font-bold transition hover:bg-muted"><LogOut size={14} /> Sign out</button></div> : null}
         <div className="rounded-[24px] bg-accent/55 p-5"><div className="flex items-center gap-2 text-primary"><CircleAlert size={16} /><span className="font-mono-ui text-[10px] uppercase tracking-[.18em]">A gentle note</span></div><p className="mt-4 font-display text-2xl leading-tight">Numbers are a map, not a grade.</p><p className="mt-3 text-xs leading-relaxed text-muted-foreground">Targets can give your choices a little shape. Listen to your body first.</p></div>
-        <div className="rounded-[24px] border border-border bg-card p-5"><p className="font-mono-ui text-[10px] uppercase tracking-[.18em] text-muted-foreground">Your current split</p><div className="mt-5 space-y-3"><TargetSummary label="Calories" value={form.calories} unit="kcal" /><TargetSummary label="Protein" value={form.protein} unit="g" /><TargetSummary label="Carbs" value={form.carbs} unit="g" /><TargetSummary label="Fat" value={form.fat} unit="g" /></div></div>
+        <div className="rounded-[24px] border border-border bg-card p-5"><p className="font-mono-ui text-[10px] uppercase tracking-[.18em] text-muted-foreground">Your current split</p><div className="mt-5 space-y-3"><TargetSummary label="Calories" value={form.calories} unit="kcal" /><TargetSummary label="Protein" value={form.protein} unit="g" /><TargetSummary label="Carbs" value={form.carbs} unit="g" /><TargetSummary label="Fat" value={form.fat} unit="g" /><TargetSummary label="Water" value={form.waterMl} unit="ml" /></div></div>
         <div className="rounded-[24px] border border-border bg-card p-5"><p className="font-mono-ui text-[10px] uppercase tracking-[.18em] text-muted-foreground">Data backup</p><p className="mt-2 text-xs text-muted-foreground">Export your meals and workouts as a JSON file, or import a previous backup.</p><div className="mt-4 flex gap-2"><button type="button" onClick={handleExport} data-testid="button-export-data" className="focus-ring inline-flex h-10 items-center gap-2 rounded-xl border border-border bg-card px-4 text-xs font-bold transition hover:bg-muted"><Download size={14} /> Export</button><button type="button" onClick={handleImport} data-testid="button-import-data" className="focus-ring inline-flex h-10 items-center gap-2 rounded-xl border border-border bg-card px-4 text-xs font-bold transition hover:bg-muted"><Upload size={14} /> Import</button></div></div>
       </div>
     </div>

@@ -13,10 +13,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const goals = await db.select().from(goalsTable)
       .where(eq(goalsTable.userId, user.id));
     if (goals.length === 0) {
-      return res.status(200).json({ goals: { calories: 2100, protein: 120, carbs: 230, fat: 70 } });
+      return res.status(200).json({ goals: { calories: 2100, protein: 120, carbs: 230, fat: 70, waterMl: 2500 } });
     }
     const g = goals[0];
-    return res.status(200).json({ goals: { calories: g.calories, protein: g.protein, carbs: g.carbs, fat: g.fat } });
+    return res.status(200).json({ goals: { calories: g.calories, protein: g.protein, carbs: g.carbs, fat: g.fat, waterMl: g.waterMl } });
   }
 
   if (req.method === "PUT") {
@@ -40,6 +40,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         protein: parsed.data.protein,
         carbs: parsed.data.carbs,
         fat: parsed.data.fat,
+        waterMl: parsed.data.waterMl,
         updatedAt: new Date(),
       }).where(eq(goalsTable.userId, user.id));
     }

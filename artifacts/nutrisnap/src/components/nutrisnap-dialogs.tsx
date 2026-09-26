@@ -1,6 +1,6 @@
-import { Camera, Check, ImagePlus, X } from 'lucide-react';
+import { Camera, Check, ImagePlus, X, Bookmark, BookmarkCheck, Sparkles } from 'lucide-react';
 import { useEffect, useRef, useState, type ChangeEvent, type FormEvent, type ReactNode } from 'react';
-import type { Meal, MealType, Workout } from '@/lib/nutrisnap-storage';
+import type { Meal, MealType, SavedMeal, Workout } from '@/lib/nutrisnap-storage';
 import { todayKey, workoutTargetAreas, type WorkoutTarget } from '@/lib/nutrisnap-storage';
 import { MuscleMap } from '@/components/muscle-map';
 import { useAuth } from '@/lib/auth-context';
@@ -133,9 +133,12 @@ type MealFormProps = {
   meal?: Meal;
   onClose: () => void;
   onSave: (meal: Omit<Meal, 'id'>) => void;
+  savedMeals?: SavedMeal[];
+  onSaveFavorite?: (meal: Omit<SavedMeal, 'id'>) => void;
+  onDeleteSaved?: (id: string) => void;
 };
 
-export function MealDialog({ meal, onClose, onSave }: MealFormProps) {
+export function MealDialog({ meal, onClose, onSave, savedMeals = [], onSaveFavorite, onDeleteSaved }: MealFormProps) {
   const [form, setForm] = useState<Omit<Meal, 'id'>>({
     name: meal?.name ?? '',
     mealType: meal?.mealType ?? 'Breakfast',
@@ -219,6 +222,27 @@ export function MealDialog({ meal, onClose, onSave }: MealFormProps) {
   return (
     <Modal title={meal ? 'Edit meal' : 'Add a meal'} eyebrow="Manual nutrition log" onClose={onClose}>
       <form onSubmit={submit} className="space-y-3 sm:space-y-5">
+        {savedMeals.length > 0 && !meal && (
+          <div className="rounded-2xl border border-border bg-accent/30 p-3 sm:p-4">
+            <div className="mb-2 flex items-center gap-2">
+              <Sparkles size={14} className="text-primary" />
+              <p className="text-xs font-bold">Quick add from favorites</p>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {savedMeals.map((saved) => (
+                <button
+                  key={saved.id}
+                  type="button"
+                  onClick={() => setForm({ name: saved.name, mealType: saved.mealType as MealType, date: form.date, time: form.time, calories: saved.calories, protein: saved.protein, carbs: saved.carbs, fat: saved.fat, imageDataUrl: undefined })}
+                  data-testid={`button-quick-add-${saved.id}`}
+                  className="focus-ring inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 py-1.5 text-[11px] font-bold transition hover:border-primary/50 hover:bg-card"
+                >
+                  {saved.name} <span className="text-muted-foreground">{saved.calories}kcal</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
         <div className="grid gap-3 sm:grid-cols-2 sm:gap-4">
           <Field label="Meal name" wide>
             <input required autoFocus value={form.name} onChange={(event) => set('name', event.target.value)} maxLength={100} placeholder="e.g. 2 eggs, toast, and coffee" className={inputClass} data-testid="input-meal-name" />
@@ -260,9 +284,18 @@ export function MealDialog({ meal, onClose, onSave }: MealFormProps) {
           </div>
         </div>
         {error ? <p className="text-sm font-semibold text-destructive" role="alert" data-testid="status-meal-form-error">{error}</p> : null}
-        <div className="flex flex-col-reverse gap-2 pt-1 sm:flex-row sm:justify-end">
-          <button type="button" onClick={onClose} data-testid="button-cancel-meal" className="focus-ring h-11 rounded-xl px-4 text-sm font-bold text-muted-foreground transition hover:bg-muted hover:text-foreground">Cancel</button>
-          <button type="submit" data-testid="button-save-meal" className="focus-ring inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-primary px-5 text-sm font-bold text-primary-foreground transition hover:brightness-105"><Check size={16} /> {meal ? 'Save changes' : 'Save meal'}</button>
+        <div className="flex flex-col-reverse gap-2 pt-1 sm:flex-row sm:justify-between">
+          <div className="flex gap-2">
+            {onSaveFavorite && form.name.trim() && form.calories > 0 && (
+              <button type="button" onClick={() => onSaveFavorite({ name: form.name.trim(), mealType: form.mealType, calories: Number(form.calories) || 0, protein: Number(form.protein) || 0, carbs: Number(form.carbs) || 0, fat: Number(form.fat) || 0 })} data-testid="button-save-favorite" className="focus-ring inline-flex h-11 items-center gap-2 rounded-xl border border-border bg-card px-4 text-xs font-bold text-muted-foreground transition hover:bg-muted hover:text-foreground">
+                <Bookmark size={14} /> Save as favorite
+              </button>
+            )}
+          </div>
+          <div className="flex gap-2">
+            <button type="button" onClick={onClose} data-testid="button-cancel-meal" className="focus-ring h-11 rounded-xl px-4 text-sm font-bold text-muted-foreground transition hover:bg-muted hover:text-foreground">Cancel</button>
+            <button type="submit" data-testid="button-save-meal" className="focus-ring inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-primary px-5 text-sm font-bold text-primary-foreground transition hover:brightness-105"><Check size={16} /> {meal ? 'Save changes' : 'Save meal'}</button>
+          </div>
         </div>
       </form>
     </Modal>
