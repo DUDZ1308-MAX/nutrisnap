@@ -19,10 +19,7 @@ const mealSchema = z.object({
   imageDataUrl: z.string().optional(),
 });
 
-const workoutTargetSchema = z.enum([
-  'chest', 'shoulders', 'biceps', 'triceps', 'back',
-  'core', 'glutes', 'quads', 'hamstrings', 'calves',
-]);
+const workoutTargetSchema = z.string();
 
 const workoutSchema = z.object({
   id: z.string(),

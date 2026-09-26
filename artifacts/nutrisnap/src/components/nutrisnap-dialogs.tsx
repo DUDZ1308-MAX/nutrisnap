@@ -93,19 +93,19 @@ function Field({ label, children, wide = false }: { label: string; children: Rea
 const inputClass = 'focus-ring h-11 w-full rounded-xl border border-input bg-background px-3.5 text-sm text-foreground outline-none transition placeholder:text-muted-foreground/60 focus:border-primary focus:ring-2 focus:ring-primary/10';
 
 const activityTargetMap: Record<string, string[]> = {
-  Strength: ['Chest', 'Back', 'Shoulders', 'Biceps', 'Triceps', 'Quads', 'Hamstrings', 'Glutes'],
-  Run: ['Quads', 'Hamstrings', 'Calves', 'Glutes'],
-  Walk: ['Quads', 'Calves', 'Glutes'],
-  Cycle: ['Quads', 'Hamstrings', 'Calves', 'Glutes'],
-  Yoga: ['Core', 'Flexibility'],
-  Swim: ['Back', 'Shoulders', 'Core', 'Quads'],
-  HIIT: ['Quads', 'Hamstrings', 'Core', 'Glutes'],
-  Pilates: ['Core', 'Flexibility'],
-  Rowing: ['Back', 'Biceps', 'Quads', 'Core'],
-  'Jump Rope': ['Calves', 'Quads', 'Shoulders'],
-  Stretching: ['Flexibility'],
-  Dance: ['Quads', 'Glutes', 'Core'],
-  Other: ['Full Body'],
+  Strength: ['chest', 'back', 'shoulders', 'biceps', 'triceps', 'quads', 'hamstrings', 'glutes'],
+  Run: ['quads', 'hamstrings', 'calves', 'glutes'],
+  Walk: ['quads', 'calves', 'glutes'],
+  Cycle: ['quads', 'hamstrings', 'calves', 'glutes'],
+  Yoga: ['core'],
+  Swim: ['back', 'shoulders', 'core', 'quads'],
+  HIIT: ['quads', 'hamstrings', 'core', 'glutes'],
+  Pilates: ['core'],
+  Rowing: ['back', 'biceps', 'quads', 'core'],
+  'Jump Rope': ['calves', 'quads', 'shoulders'],
+  Stretching: [],
+  Dance: ['quads', 'glutes', 'core'],
+  Other: ['core'],
 };
 
 const activityMET: Record<string, number> = {
