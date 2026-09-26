@@ -75,8 +75,8 @@ function AuthenticatedApp() {
           <Route component={NotFound} />
         </Switch>
       </RoutedErrorBoundary>
-      {modal === 'meal' ? <MealDialog meal={editingMeal} onClose={closeModal} onSave={(meal) => { editingMeal ? data.updateMeal(editingMeal.id, meal) : data.addMeal(meal); closeModal(); }} /> : null}
-      {modal === 'workout' ? <WorkoutDialog workout={editingWorkout} onClose={closeModal} onSave={(workout) => { editingWorkout ? data.updateWorkout(editingWorkout.id, workout) : data.addWorkout(workout); closeModal(); }} /> : null}
+      {modal === 'meal' ? <MealDialog meal={editingMeal} onClose={closeModal} onSave={async (meal) => { try { editingMeal ? await data.updateMeal(editingMeal.id, meal) : await data.addMeal(meal); closeModal(); } catch (err) { console.error('Failed to save meal:', err); } }} /> : null}
+      {modal === 'workout' ? <WorkoutDialog workout={editingWorkout} onClose={closeModal} onSave={async (workout) => { try { editingWorkout ? await data.updateWorkout(editingWorkout.id, workout) : await data.addWorkout(workout); closeModal(); } catch (err) { console.error('Failed to save workout:', err); } }} /> : null}
     </NutriSnapShell>
   );
 }

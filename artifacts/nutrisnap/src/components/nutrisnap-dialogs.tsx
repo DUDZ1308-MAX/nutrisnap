@@ -321,7 +321,7 @@ export function WorkoutDialog({ workout, onClose, onSave }: WorkoutFormProps) {
           <Field label="Date"><input type="date" value={form.date} onChange={(event) => set('date', event.target.value)} className={inputClass} data-testid="input-workout-date" /></Field>
           <Field label="Duration · min"><input type="number" min="0" max="9999" value={form.durationMinutes} onChange={(event) => handleDurationChange(Number(event.target.value))} className={inputClass} data-testid="input-workout-duration" /></Field>
           <Field label="Calories burned (auto)"><input type="number" min="0" max="99999" value={form.caloriesBurned} onChange={(event) => set('caloriesBurned', Number(event.target.value))} className={inputClass} data-testid="input-workout-calories" /></Field>
-          <Field label="Notes"><textarea value={form.notes} onChange={(event) => set('notes', event.target.value)} maxLength={500} placeholder="How did it feel?" rows={2} className={`${inputClass} h-auto py-2`} data-testid="input-workout-notes" /></Field>
+          <Field label="Notes"><textarea value={form.notes ?? ''} onChange={(event) => set('notes', event.target.value)} maxLength={500} placeholder="How did it feel?" rows={2} className={`${inputClass} h-auto py-2`} data-testid="input-workout-notes" /></Field>
         </div>
         <Field label="Target areas" wide>
           <div className="rounded-2xl border border-border bg-muted/35 p-3">

@@ -146,15 +146,25 @@ export function useNutriSnap() {
   }, []);
 
   const addMeal = useCallback(async (meal: Omit<Meal, 'id'>) => {
-    const result = await api.createMeal(meal);
-    const newMeal = { ...meal, id: result.id };
-    setMeals((prev) => [newMeal, ...prev]);
-    return newMeal;
+    try {
+      const result = await api.createMeal(meal);
+      const newMeal = { ...meal, id: result.id };
+      setMeals((prev) => [newMeal, ...prev]);
+      return newMeal;
+    } catch (err) {
+      console.error('addMeal failed:', err);
+      throw err;
+    }
   }, []);
 
   const updateMeal = useCallback(async (id: string, patch: Omit<Meal, 'id'>) => {
-    await api.updateMeal(id, patch);
-    setMeals((prev) => prev.map((m) => m.id === id ? { ...patch, id } : m));
+    try {
+      await api.updateMeal(id, patch);
+      setMeals((prev) => prev.map((m) => m.id === id ? { ...patch, id } : m));
+    } catch (err) {
+      console.error('updateMeal failed:', err);
+      throw err;
+    }
   }, []);
 
   const deleteMeal = useCallback(async (id: string) => {
@@ -163,15 +173,25 @@ export function useNutriSnap() {
   }, []);
 
   const addWorkout = useCallback(async (workout: Omit<Workout, 'id'>) => {
-    const result = await api.createWorkout(workout);
-    const newWorkout = { ...workout, id: result.id };
-    setWorkouts((prev) => [newWorkout, ...prev]);
-    return newWorkout;
+    try {
+      const result = await api.createWorkout(workout);
+      const newWorkout = { ...workout, id: result.id };
+      setWorkouts((prev) => [newWorkout, ...prev]);
+      return newWorkout;
+    } catch (err) {
+      console.error('addWorkout failed:', err);
+      throw err;
+    }
   }, []);
 
   const updateWorkout = useCallback(async (id: string, patch: Omit<Workout, 'id'>) => {
-    await api.updateWorkout(id, patch);
-    setWorkouts((prev) => prev.map((w) => w.id === id ? { ...patch, id } : w));
+    try {
+      await api.updateWorkout(id, patch);
+      setWorkouts((prev) => prev.map((w) => w.id === id ? { ...patch, id } : w));
+    } catch (err) {
+      console.error('updateWorkout failed:', err);
+      throw err;
+    }
   }, []);
 
   const deleteWorkout = useCallback(async (id: string) => {
