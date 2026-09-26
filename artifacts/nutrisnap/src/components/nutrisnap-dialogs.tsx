@@ -47,21 +47,41 @@ function Modal({ title, eyebrow, onClose, children }: ModalProps) {
     };
   }, []);
 
+  const handleOverlayClick = (e: React.MouseEvent) => { if (e.target === e.currentTarget) onClose(); };
+
   return (
-    <div ref={overlayRef} className="fixed inset-0 z-50 bg-background sm:overflow-y-auto sm:bg-foreground/35 sm:backdrop-blur-[3px]" role="dialog" aria-modal="true" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="flex h-full items-end p-3 sm:h-auto sm:min-h-full sm:items-center sm:justify-center sm:p-4 sm:pt-16">
-      <div className="max-h-[85vh] w-full overflow-y-auto rounded-[16px] bg-card p-4 shadow-2xl sm:max-h-none sm:rounded-[26px] sm:p-7">
-        <div className="mb-4 flex items-start justify-between gap-4 sm:mb-6">
-          <div>
-            <p className="font-mono-ui text-[10px] uppercase tracking-[.2em] text-primary">{eyebrow}</p>
-            <h2 className="mt-1 font-display text-2xl tracking-[-.04em] text-card-foreground sm:text-3xl">{title}</h2>
+    <>
+    {/* MOBILE: full-screen scrollable sheet */}
+    <div className="fixed inset-0 z-50 flex items-end overflow-y-auto bg-background sm:hidden" role="dialog" aria-modal="true" onClick={handleOverlayClick}>
+      <div className="min-h-full w-full p-3 pt-6">
+        <div className="rounded-[16px] bg-card p-4 shadow-2xl">
+          <div className="mb-4 flex items-start justify-between gap-4">
+            <div>
+              <p className="font-mono-ui text-[10px] uppercase tracking-[.2em] text-primary">{eyebrow}</p>
+              <h2 className="mt-1 font-display text-2xl tracking-[-.04em] text-card-foreground">{title}</h2>
+            </div>
+            <button type="button" onClick={onClose} data-testid="button-close-dialog" className="focus-ring grid size-9 place-items-center rounded-full text-muted-foreground transition hover:bg-muted hover:text-foreground"><X size={18} /></button>
           </div>
-          <button type="button" onClick={onClose} data-testid="button-close-dialog" className="focus-ring grid size-9 place-items-center rounded-full text-muted-foreground transition hover:bg-muted hover:text-foreground"><X size={18} /></button>
+          {children}
         </div>
-        {children}
-      </div>
       </div>
     </div>
+    {/* DESKTOP: centered card with scrollable overlay */}
+    <div ref={overlayRef} className="fixed inset-0 z-50 hidden overflow-y-auto bg-foreground/35 backdrop-blur-[3px] sm:block" role="dialog" aria-modal="true" onClick={handleOverlayClick}>
+      <div className="mx-auto w-full max-w-[620px] p-4 pt-16">
+        <div className="rounded-[26px] bg-card p-7 shadow-2xl">
+          <div className="mb-6 flex items-start justify-between gap-4">
+            <div>
+              <p className="font-mono-ui text-[10px] uppercase tracking-[.2em] text-primary">{eyebrow}</p>
+              <h2 className="mt-1 font-display text-3xl tracking-[-.04em] text-card-foreground">{title}</h2>
+            </div>
+            <button type="button" onClick={onClose} data-testid="button-close-dialog" className="focus-ring grid size-9 place-items-center rounded-full text-muted-foreground transition hover:bg-muted hover:text-foreground"><X size={18} /></button>
+          </div>
+          {children}
+        </div>
+      </div>
+    </div>
+    </>
   );
 }
 
