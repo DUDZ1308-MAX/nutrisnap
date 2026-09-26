@@ -80,4 +80,4 @@ export function requireAuth(req: VercelRequest, res: VercelResponse): AuthUser |
   return user;
 }
 
-export { getDb, bcrypt, eq };
+export { getDb, bcrypt, eq, and };

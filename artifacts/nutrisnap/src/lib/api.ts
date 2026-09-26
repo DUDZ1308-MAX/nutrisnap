@@ -129,7 +129,7 @@ export async function logWater(date: string, amountMl: number) {
 }
 
 export async function deleteWater(id: string) {
-  return apiFetch<OkResponse>(`/api/water/${id}`, { method: 'DELETE' });
+  return apiFetch<OkResponse>(`/api/water?id=${id}`, { method: 'DELETE' });
 }
 
 // ── Saved Meals ────────────────────────────────────────────────────────────
@@ -148,7 +148,7 @@ export async function createSavedMeal(meal: Record<string, unknown>) {
 }
 
 export async function deleteSavedMeal(id: string) {
-  return apiFetch<OkResponse>(`/api/saved-meals/${id}`, { method: 'DELETE' });
+  return apiFetch<OkResponse>(`/api/saved-meals?id=${id}`, { method: 'DELETE' });
 }
 
 // ── Weekly Summary ─────────────────────────────────────────────────────────
