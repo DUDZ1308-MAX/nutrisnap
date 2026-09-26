@@ -160,5 +160,5 @@ interface WeekSummaryResponse {
 }
 
 export async function getWeekSummary() {
-  return apiFetch<WeekSummaryResponse>('/api/summary/week');
+  return apiFetch<WeekSummaryResponse>('/api/goals?summary=week');
 }
