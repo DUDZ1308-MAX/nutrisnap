@@ -75,11 +75,11 @@ export async function createMeal(meal: Record<string, unknown>) {
 }
 
 export async function updateMeal(id: string, meal: Record<string, unknown>) {
-  return apiFetch<OkResponse>(`/api/meals/${id}`, { method: 'PUT', body: JSON.stringify(meal) });
+  return apiFetch<OkResponse>(`/api/meals?id=${id}`, { method: 'PUT', body: JSON.stringify(meal) });
 }
 
 export async function deleteMeal(id: string) {
-  return apiFetch<OkResponse>(`/api/meals/${id}`, { method: 'DELETE' });
+  return apiFetch<OkResponse>(`/api/meals?id=${id}`, { method: 'DELETE' });
 }
 
 export async function getWorkouts() {
@@ -92,11 +92,11 @@ export async function createWorkout(workout: Record<string, unknown>) {
 }
 
 export async function updateWorkout(id: string, workout: Record<string, unknown>) {
-  return apiFetch<OkResponse>(`/api/workouts/${id}`, { method: 'PUT', body: JSON.stringify(workout) });
+  return apiFetch<OkResponse>(`/api/workouts?id=${id}`, { method: 'PUT', body: JSON.stringify(workout) });
 }
 
 export async function deleteWorkout(id: string) {
-  return apiFetch<OkResponse>(`/api/workouts/${id}`, { method: 'DELETE' });
+  return apiFetch<OkResponse>(`/api/workouts?id=${id}`, { method: 'DELETE' });
 }
 
 export async function getGoals() {

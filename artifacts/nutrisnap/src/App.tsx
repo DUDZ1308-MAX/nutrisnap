@@ -37,6 +37,8 @@ import { todayKey, useNutriSnap, workoutTargetAreas, exportData, downloadExport,
 import { MuscleMap } from '@/components/muscle-map';
 import { WaterTracker } from '@/components/water-tracker';
 import { WeeklySummary } from '@/components/weekly-summary';
+import { TrendChart } from '@/components/trend-chart';
+import { StreakBadge } from '@/components/streak-badge';
 
 const queryClient = new QueryClient();
 
@@ -179,8 +181,12 @@ function Overview({ data, onAddMeal, onAddWorkout, onEditMeal, onEditWorkout, on
 
       <HealthStats user={user} goals={data.goals} />
 
-      <div className="mt-5 grid gap-5 sm:grid-cols-2">
+      <TrendChart meals={data.meals} workouts={data.workouts} />
+
+      <div className="mt-5 grid gap-5 sm:grid-cols-3">
         <WaterTracker totalMl={data.waterTotalMl} goalMl={data.goals.waterMl} entries={data.waterEntries} onAdd={(amountMl) => data.addWater(amountMl)} onRemove={(id) => data.deleteWater(id)} />
+
+        <StreakBadge meals={data.meals} workouts={data.workouts} waterLogs={data.waterEntries} />
 
         <section className="rounded-[20px] border border-border bg-card p-4 shadow-sm sm:rounded-[24px] sm:p-6">
           <div className="flex items-start justify-between gap-4">
