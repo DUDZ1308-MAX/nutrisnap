@@ -100,7 +100,8 @@ export async function deleteWorkout(id: string) {
 }
 
 export async function getGoals() {
-  return apiFetch<GoalsResponse>('/api/goals');
+  const data = await apiFetch<GoalsResponse>('/api/goals');
+  return data.goals;
 }
 
 export async function updateGoals(goals: Record<string, unknown>) {

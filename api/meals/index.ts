@@ -9,8 +9,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const db = getDb();
 
   if (req.method === "GET") {
-    const meals = await db.select().from(mealsTable)
+    const rows = await db.select().from(mealsTable)
       .where(eq(mealsTable.userId, user.id));
+    const meals = rows.map((m) => ({
+      ...m,
+      imageDataUrl: m.imageDataUrl ?? undefined,
+    }));
     return res.status(200).json({ meals });
   }
 

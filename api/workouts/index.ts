@@ -9,8 +9,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const db = getDb();
 
   if (req.method === "GET") {
-    const workouts = await db.select().from(workoutsTable)
+    const rows = await db.select().from(workoutsTable)
       .where(eq(workoutsTable.userId, user.id));
+    const workouts = rows.map((w) => ({
+      ...w,
+      targetAreas: typeof w.targetAreas === "string" ? JSON.parse(w.targetAreas) : w.targetAreas,
+    }));
     return res.status(200).json({ workouts });
   }
 

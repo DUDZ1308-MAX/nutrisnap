@@ -10,10 +10,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const id = req.query.id as string;
 
   if (req.method === "GET") {
-    const meals = await db.select().from(mealsTable)
+    const rows = await db.select().from(mealsTable)
       .where(and(eq(mealsTable.id, id), eq(mealsTable.userId, user.id)));
-    if (meals.length === 0) return res.status(404).json({ error: "Not found" });
-    return res.status(200).json({ meal: meals[0] });
+    if (rows.length === 0) return res.status(404).json({ error: "Not found" });
+    const meal = { ...rows[0], imageDataUrl: rows[0].imageDataUrl ?? undefined };
+    return res.status(200).json({ meal });
   }
 
   if (req.method === "PUT") {

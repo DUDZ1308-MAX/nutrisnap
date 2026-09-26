@@ -10,10 +10,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const id = req.query.id as string;
 
   if (req.method === "GET") {
-    const workouts = await db.select().from(workoutsTable)
+    const rows = await db.select().from(workoutsTable)
       .where(and(eq(workoutsTable.id, id), eq(workoutsTable.userId, user.id)));
-    if (workouts.length === 0) return res.status(404).json({ error: "Not found" });
-    return res.status(200).json({ workout: workouts[0] });
+    if (rows.length === 0) return res.status(404).json({ error: "Not found" });
+    const workout = { ...rows[0], targetAreas: typeof rows[0].targetAreas === "string" ? JSON.parse(rows[0].targetAreas) : rows[0].targetAreas };
+    return res.status(200).json({ workout });
   }
 
   if (req.method === "PUT") {
