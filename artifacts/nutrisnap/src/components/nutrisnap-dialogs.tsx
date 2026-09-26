@@ -16,7 +16,13 @@ function Modal({ title, eyebrow, onClose, children }: ModalProps) {
     const overlay = overlayRef.current;
     if (!overlay) return;
 
-    window.scrollTo(0, 0);
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
+    window.scrollTo({ top: 0 });
+    document.body.style.position = 'fixed';
+    document.body.style.top = '0';
+    document.body.style.left = '0';
+    document.body.style.right = '0';
     document.body.style.overflow = 'hidden';
 
     const focusable = overlay.querySelectorAll<HTMLElement>(
@@ -40,6 +46,10 @@ function Modal({ title, eyebrow, onClose, children }: ModalProps) {
 
     return () => {
       overlay.removeEventListener('keydown', handleKeyDown);
+      document.body.style.position = '';
+      document.body.style.top = '';
+      document.body.style.left = '';
+      document.body.style.right = '';
       document.body.style.overflow = '';
       previous?.focus();
     };
