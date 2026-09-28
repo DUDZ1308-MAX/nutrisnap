@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { getDb, bcrypt, eq, and, isNull, gt, hashResetToken, clearAuthCookie } from "../lib.js";
+import { getDb, bcrypt, eq, and, isNull, gt, hashResetToken, clearAuthCookie } from "../_lib.js";
 import { usersTable, passwordResetTokensTable } from "../../lib/db/src/schema/index.js";
 
 const INVALID_LINK = "This reset link is invalid or has expired.";

@@ -6,6 +6,9 @@ import { eq, and, isNull, gt } from "drizzle-orm";
 import jwt from "jsonwebtoken";
 import { parse, serialize } from "cookie";
 import bcrypt from "bcryptjs";
+// Node's crypto, not the Web Crypto global: `crypto` alone resolves to the DOM
+// Crypto type, which has no randomBytes/createHash.
+import crypto from "crypto";
 
 const { Pool } = pg;
 

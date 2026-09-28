@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { getDb, eq, generateResetToken, hashResetToken, sendPasswordResetEmail, RESET_TOKEN_TTL_MS } from "../lib.js";
+import { getDb, eq, generateResetToken, hashResetToken, sendPasswordResetEmail, RESET_TOKEN_TTL_MS } from "../_lib.js";
 import { usersTable, passwordResetTokensTable } from "../../lib/db/src/schema/index.js";
 import crypto from "crypto";
 

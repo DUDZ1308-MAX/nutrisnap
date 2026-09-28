@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { getDb, bcrypt, signToken, setAuthCookie, normalizeUnits } from "../lib.js";
+import { getDb, bcrypt, signToken, setAuthCookie, normalizeUnits } from "../_lib.js";
 import { usersTable } from "../../lib/db/src/schema/index.js";
 import { eq } from "drizzle-orm";
 import { loginSchema } from "../../lib/db/src/schema/users.js";

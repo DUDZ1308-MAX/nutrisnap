@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { getDb, requireAuth, signToken, setAuthCookie, eq, normalizeUnits } from "../lib.js";
+import { getDb, requireAuth, signToken, setAuthCookie, eq, normalizeUnits } from "../_lib.js";
 import { usersTable } from "../../lib/db/src/schema/index.js";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {

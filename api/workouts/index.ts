@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { getDb, requireAuth, eq } from "../lib.js";
+import { getDb, requireAuth, eq } from "../_lib.js";
 import { workoutsTable } from "../../lib/db/src/schema/index.js";
 import { and } from "drizzle-orm";
 import crypto from "crypto";

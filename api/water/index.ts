@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { getDb, requireAuth, eq, and } from "../lib.js";
+import { getDb, requireAuth, eq, and } from "../_lib.js";
 import { waterLogsTable } from "../../lib/db/src/schema/index.js";
 import crypto from "crypto";
 

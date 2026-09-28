@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { getDb, requireAuth, eq } from "../lib.js";
+import { getDb, requireAuth, eq } from "../_lib.js";
 import { goalsTable, mealsTable, workoutsTable, waterLogsTable } from "../../lib/db/src/schema/index.js";
 import { goalsSchema } from "../../lib/db/src/schema/goals.js";
 import crypto from "crypto";
