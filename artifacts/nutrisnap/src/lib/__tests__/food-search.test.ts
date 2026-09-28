@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { normalizeFdcFood, normalizeFdcSearch, parseGrams, scalePer100g } from "../../../../../api/nutrition/_fdc";
+import { normalizeFdcFood, normalizeFdcSearch, parseGrams, rankFdcFoods, scalePer100g } from "../../../../../api/nutrition/_fdc";
 
 // A Survey (FNDDS) food as FDC returns it. Nutrient names are deliberately the
 // real ones ("Total lipid (fat)", "Carbohydrate, by difference") because the
@@ -110,6 +110,37 @@ describe("normalizeFdcSearch", () => {
     expect(result).toHaveLength(1);
     expect(result[0].per100g.fat).toBe(100);
     expect(result[0].per100g.calories).toBeNull();
+  });
+});
+
+describe("rankFdcFoods", () => {
+  const food = (fdcId: number, dataType: string): ReturnType<typeof normalizeFdcFood> => ({
+    fdcId,
+    description: `food ${fdcId}`,
+    dataType,
+    brand: null,
+    per100g: { calories: 100, protein: 1, carbs: 1, fat: 1 },
+  });
+
+  it("floats generic datasets above branded products", () => {
+    const ranked = rankFdcFoods([food(1, "Branded"), food(2, "Survey (FNDDS)"), food(3, "Foundation")]);
+    expect(ranked.map((f) => f.dataType)).toEqual(["Foundation", "Survey (FNDDS)", "Branded"]);
+  });
+
+  it("keeps FDC's relevance order within a dataset", () => {
+    const ranked = rankFdcFoods([food(1, "Branded"), food(2, "Branded"), food(3, "Survey (FNDDS)"), food(4, "Branded")]);
+    expect(ranked.map((f) => f.fdcId)).toEqual([3, 1, 2, 4]);
+  });
+
+  it("sorts an unknown dataset last", () => {
+    const ranked = rankFdcFoods([food(1, "Experimental"), food(2, "SR Legacy")]);
+    expect(ranked.map((f) => f.dataType)).toEqual(["SR Legacy", "Experimental"]);
+  });
+
+  it("does not mutate the input", () => {
+    const input = [food(1, "Branded"), food(2, "Foundation")];
+    rankFdcFoods(input);
+    expect(input.map((f) => f.fdcId)).toEqual([1, 2]);
   });
 });
 

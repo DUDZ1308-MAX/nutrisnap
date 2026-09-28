@@ -71,7 +71,7 @@ function Modal({ title, eyebrow, onClose, children }: ModalProps) {
     {/* DESKTOP: centered card with scrollable overlay */}
     <div ref={overlayRef} className="fixed inset-0 z-50 hidden overflow-y-auto bg-foreground/35 backdrop-blur-[3px] sm:block" role="dialog" aria-modal="true" onClick={handleOverlayClick}>
       <div className="mx-auto w-full max-w-[620px] p-4 pt-16">
-        <div className="rounded-[26px] bg-card p-7 shadow-2xl">
+        <div className="max-h-[calc(100vh-6rem)] overflow-y-auto rounded-[26px] bg-card p-7 shadow-2xl">
           <div className="mb-6 flex items-start justify-between gap-4">
             <div>
               <p className="font-mono-ui text-[10px] uppercase tracking-[.2em] text-primary">{eyebrow}</p>
@@ -672,7 +672,7 @@ export function MealDialog({ meal, onClose, onSave, savedMeals = [], onSaveFavor
           </div>
         </div>
         {error ? <p className="text-sm font-semibold text-destructive" role="alert" data-testid="status-meal-form-error">{error}</p> : null}
-        <div className="flex flex-col-reverse gap-2 pt-1 sm:flex-row sm:justify-between">
+        <div className="sticky bottom-0 -mx-7 flex flex-col-reverse gap-2 bg-card px-7 pb-7 pt-3 sm:flex-row sm:justify-between">
           <div className="flex gap-2">
             {onSaveFavorite && form.name.trim() && form.calories > 0 && (
               <button type="button" onClick={() => onSaveFavorite({ name: form.name.trim(), mealType: form.mealType, calories: Number(form.calories) || 0, protein: Number(form.protein) || 0, carbs: Number(form.carbs) || 0, fat: Number(form.fat) || 0 })} data-testid="button-save-favorite" className="focus-ring inline-flex h-11 items-center gap-2 rounded-xl border border-border bg-card px-4 text-xs font-bold text-muted-foreground transition hover:bg-muted hover:text-foreground">

@@ -93,6 +93,31 @@ export function normalizeFdcSearch(raw: unknown): FdcFood[] {
   return results;
 }
 
+const DATA_TYPE_PRIORITY: Record<string, number> = {
+  Foundation: 0,
+  "Survey (FNDDS)": 1,
+  "SR Legacy": 2,
+  Branded: 3,
+};
+
+/**
+ * FDC's relevance ranking puts a specific branded product above the generic food
+ * someone typing a name actually wants, so generic datasets are floated up.
+ *
+ * The API's own dataType filter is deliberately not used: measured against the
+ * live endpoint it turns a reliable request into one that fails with a 400
+ * roughly two times out of three, while omitting it is consistently successful.
+ */
+export function rankFdcFoods(foods: FdcFood[]): FdcFood[] {
+  return foods
+    .map((food, index) => ({ food, index }))
+    .sort((a, b) => {
+      const delta = (DATA_TYPE_PRIORITY[a.food.dataType] ?? 4) - (DATA_TYPE_PRIORITY[b.food.dataType] ?? 4);
+      return delta !== 0 ? delta : a.index - b.index;
+    })
+    .map((entry) => entry.food);
+}
+
 /** A single meal portion past this is a typo rather than a portion. */
 export const MAX_PORTION_GRAMS = 3000;
 

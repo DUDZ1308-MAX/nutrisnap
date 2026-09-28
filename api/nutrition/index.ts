@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { requireAuth } from "../_lib.js";
 import { parseBarcode, normalizeOffProduct, toWholeNumbers } from "./_normalize.js";
-import { normalizeFdcSearch } from "./_fdc.js";
+import { normalizeFdcSearch, rankFdcFoods } from "./_fdc.js";
 import {
   ANALYZE_SYSTEM_PROMPT,
   ANALYZE_RESPONSE_SCHEMA,
@@ -62,12 +62,8 @@ const UPSTREAM_TIMEOUT_MS = 8000;
 // FoodData Central covers generic foods, which is what someone typing a food
 // name actually wants. Its Branded dataset dominates relevance ranking for
 // queries like "chicken breast" and answers with a specific packaged product
-// nobody was looking for, so those types are excluded server-side.
+// nobody was looking for, so results are re-ranked in rankFdcFoods instead.
 const FDC_SEARCH_URL = "https://api.nal.usda.gov/fdc/v1/foods/search";
-// The space is pre-encoded but the parentheses are deliberately left raw:
-// FDC answers 400 when dataType arrives as "Survey%20%28FNDDS%29". This value
-// must be concatenated verbatim and never passed through encodeURIComponent.
-const FDC_DATA_TYPES = "Foundation,Survey%20(FNDDS)";
 const FDC_PAGE_SIZE = 12;
 // Food composition data does not change between releases, so searches are held
 // far longer than barcodes, including empty results.
@@ -294,8 +290,9 @@ async function handleSearch(req: VercelRequest, res: VercelResponse, rawQuery: s
 
   let envelope: unknown;
   try {
-    // query and the key are encoded; FDC_DATA_TYPES is not, on purpose.
-    const url = `${FDC_SEARCH_URL}?query=${encodeURIComponent(query)}&dataType=${FDC_DATA_TYPES}&pageSize=${FDC_PAGE_SIZE}&api_key=${encodeURIComponent(apiKey)}`;
+    // The dataType filter is omitted on purpose: it makes the endpoint return
+    // intermittent 400s, and ranking happens in rankFdcFoods instead.
+    const url = `${FDC_SEARCH_URL}?query=${encodeURIComponent(query)}&pageSize=${FDC_PAGE_SIZE}&api_key=${encodeURIComponent(apiKey)}`;
     const response = await fetch(url, { headers: { Accept: "application/json" }, signal: controller.signal });
 
     if (!response.ok) {
@@ -319,7 +316,7 @@ async function handleSearch(req: VercelRequest, res: VercelResponse, rawQuery: s
     clearTimeout(timer);
   }
 
-  const foods = normalizeFdcSearch(envelope);
+  const foods = rankFdcFoods(normalizeFdcSearch(envelope));
 
   // Empty results are cached too, otherwise every keystroke that matches
   // nothing spends a FoodData Central request.
