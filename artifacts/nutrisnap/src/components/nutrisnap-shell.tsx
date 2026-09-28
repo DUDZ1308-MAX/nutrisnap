@@ -20,7 +20,7 @@ export function NutriSnapShell({ children, onQuickAdd }: ShellProps) {
 
   return (
     <div className="app-shell grain flex text-foreground">
-      <aside className="hidden md:flex md:w-[246px] md:flex-col md:justify-between bg-sidebar text-sidebar-foreground shrink-0">
+      <aside className="hidden md:flex md:w-[246px] md:flex-col md:justify-between md:sticky md:top-0 md:h-dvh md:self-start md:overflow-y-auto bg-sidebar text-sidebar-foreground shrink-0">
         <div>
           <div className="px-7 pt-8 pb-10">
             <Link href="/" className="focus-ring inline-flex items-center gap-3" data-testid="link-brand">
