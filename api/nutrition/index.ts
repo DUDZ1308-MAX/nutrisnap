@@ -17,10 +17,16 @@ const OFF_PRODUCT_URL = "https://world.openfoodfacts.org/api/v2/product";
 const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-3.5-flash-lite";
 const GEMINI_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
 
-// Vision inference is far slower and costlier than a barcode lookup.
-const ANALYZE_TIMEOUT_MS = 30000;
+// Vision inference is far slower and costlier than a barcode lookup. Measured calls
+// against Gemini have run from 9s to 42s, so the function must be allowed to stay up
+// well past Vercel's default 10s limit or the platform kills it mid-request.
+export const config = { maxDuration: 60 };
+
+const ANALYZE_TIMEOUT_MS = 55000;
 const ANALYZE_THROTTLE_WINDOW_MS = 60 * 1000;
 const ANALYZE_MAX_PER_WINDOW = 10;
+// Gemini returns UNAVAILABLE under real load often enough to be worth one retry.
+const ANALYZE_ATTEMPTS = 2;
 
 // The browser already downsizes the photo, so anything larger is not a real meal shot.
 const MAX_IMAGE_BYTES = 1_500_000;
@@ -163,55 +169,74 @@ async function handleAnalyze(req: VercelRequest, res: VercelResponse) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), ANALYZE_TIMEOUT_MS);
 
-  let modelReply: string;
+  let modelReply = "";
+  let lastStatus = 0;
+  let lastDetail = "";
+
   try {
-    const response = await fetch(GEMINI_ENDPOINT, {
-      method: "POST",
-      headers: { "x-goog-api-key": apiKey, "Content-Type": "application/json" },
-      signal: controller.signal,
-      body: JSON.stringify({
-        systemInstruction: { parts: [{ text: ANALYZE_SYSTEM_PROMPT }] },
-        contents: [
-          {
-            role: "user",
-            parts: [{ text: buildAnalyzePrompt() }, { inline_data: { mime_type: image.mimeType, data: image.base64 } }],
+    for (let attempt = 1; attempt <= ANALYZE_ATTEMPTS; attempt += 1) {
+      const response = await fetch(GEMINI_ENDPOINT, {
+        method: "POST",
+        headers: { "x-goog-api-key": apiKey, "Content-Type": "application/json" },
+        signal: controller.signal,
+        body: JSON.stringify({
+          systemInstruction: { parts: [{ text: ANALYZE_SYSTEM_PROMPT }] },
+          contents: [
+            {
+              role: "user",
+              parts: [{ text: buildAnalyzePrompt() }, { inline_data: { mime_type: image.mimeType, data: image.base64 } }],
+            },
+          ],
+          generationConfig: {
+            temperature: 0.2,
+            // Six components is a few hundred tokens; a small ceiling measurably
+            // cuts latency, which is the slowest part of this request.
+            maxOutputTokens: 1024,
+            responseMimeType: "application/json",
+            responseSchema: ANALYZE_RESPONSE_SCHEMA,
           },
-        ],
-        generationConfig: {
-          temperature: 0.2,
-          maxOutputTokens: 2048,
-          responseMimeType: "application/json",
-          responseSchema: ANALYZE_RESPONSE_SCHEMA,
-        },
-      }),
-    });
+        }),
+      });
 
-    if (!response.ok) {
-      const detail = await response.text();
-      console.error(`Gemini responded ${response.status}: ${detail.slice(0, 500)}`);
+      if (response.ok) {
+        const payload = await response.json();
+        const parts = payload?.candidates?.[0]?.content?.parts;
+        modelReply = Array.isArray(parts)
+          ? parts.map((part: { text?: unknown }) => (typeof part.text === "string" ? part.text : "")).join("")
+          : "";
+        break;
+      }
 
-      if (response.status === 503) {
-        return res.status(503).json({ error: "Photo analysis is busy right now. Try again shortly." });
+      lastStatus = response.status;
+      lastDetail = (await response.text()).slice(0, 500);
+
+      const retryable = response.status === 503 || response.status === 429;
+      if (!retryable || attempt === ANALYZE_ATTEMPTS) {
+        console.error(`Gemini responded ${response.status}: ${lastDetail}`);
+        break;
       }
-      if (response.status === 429) {
-        return res.status(429).json({ error: "Photo analysis hit its rate limit. Try again shortly." });
-      }
-      if (response.status === 400) {
-        return res.status(502).json({ error: "Photo analysis could not understand that photo. Try a clearer one." });
-      }
-      return res.status(502).json({ error: "Photo analysis failed. Try again shortly." });
+
+      console.warn(`Gemini ${response.status} on attempt ${attempt}/${ANALYZE_ATTEMPTS}, retrying`);
+      await new Promise((resolve) => setTimeout(resolve, 800 * attempt));
     }
-
-    const payload = await response.json();
-    const parts = payload?.candidates?.[0]?.content?.parts;
-    modelReply = Array.isArray(parts)
-      ? parts.map((part: { text?: unknown }) => (typeof part.text === "string" ? part.text : "")).join("")
-      : "";
   } catch (error) {
     console.error("Photo analysis failed:", error);
     return res.status(502).json({ error: "Photo analysis timed out. Try again." });
   } finally {
     clearTimeout(timer);
+  }
+
+  if (!modelReply) {
+    if (lastStatus === 503) {
+      return res.status(503).json({ error: "Photo analysis is busy right now. Try again shortly." });
+    }
+    if (lastStatus === 429) {
+      return res.status(429).json({ error: "Photo analysis hit its rate limit. Try again shortly." });
+    }
+    if (lastStatus === 400) {
+      return res.status(502).json({ error: "Photo analysis could not understand that photo. Try a clearer one." });
+    }
+    return res.status(502).json({ error: "Photo analysis failed. Try again shortly." });
   }
 
   const result = normalizeAnalysis(parseAnalysisText(modelReply));
