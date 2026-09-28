@@ -135,9 +135,15 @@ async function handleAnalyze(req: VercelRequest, res: VercelResponse) {
     });
   }
 
+  if (body.imageDataUrl === undefined || body.imageDataUrl === null || body.imageDataUrl === "") {
+    return res.status(400).json({ error: "Add a photo to analyze." });
+  }
+
   const image = readImageDataUrl(body.imageDataUrl);
   if (!image) {
-    return res.status(400).json({ error: "Add a photo to analyze." });
+    // The photo was sent but is not something we can use, which is a different
+    // problem from having forgotten to attach one.
+    return res.status(400).json({ error: "That photo could not be read. Try a JPEG or PNG under 1 MB." });
   }
 
   if (isAnalyzeThrottled(user.id)) {
