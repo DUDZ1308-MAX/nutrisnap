@@ -1,9 +1,10 @@
-import { Camera, Check, ImagePlus, X, Bookmark, BookmarkCheck, Sparkles } from 'lucide-react';
+import { Camera, Check, ImagePlus, X, Bookmark, BookmarkCheck, Sparkles, ScanLine } from 'lucide-react';
 import { useEffect, useRef, useState, type ChangeEvent, type FormEvent, type ReactNode } from 'react';
 import type { Meal, MealType, SavedMeal, Workout } from '@/lib/nutrisnap-storage';
 import { todayKey, workoutTargetAreas, type WorkoutTarget } from '@/lib/nutrisnap-storage';
 import { MuscleMap } from '@/components/muscle-map';
 import { useAuth } from '@/lib/auth-context';
+import { lookupBarcode } from '@/lib/api';
 
 type ModalProps = { title: string; eyebrow: string; onClose: () => void; children: ReactNode };
 
@@ -92,6 +93,91 @@ function Field({ label, children, wide = false }: { label: string; children: Rea
 
 const inputClass = 'focus-ring h-11 w-full rounded-xl border border-input bg-background px-3.5 text-sm text-foreground outline-none transition placeholder:text-muted-foreground/60 focus:border-primary focus:ring-2 focus:ring-primary/10';
 
+type BarcodeScannerProps = { onClose: () => void; onDetected: (code: string) => void };
+
+function BarcodeScanner({ onClose, onDetected }: BarcodeScannerProps) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [cameraError, setCameraError] = useState('');
+  const [manual, setManual] = useState('');
+  const settled = useRef(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    let controls: { stop: () => void } | undefined;
+
+    // Imported lazily so the decoder bundle is only fetched when the scanner opens.
+    import('@zxing/library').then(({ BrowserMultiFormatReader }) => {
+      if (cancelled || settled.current) return;
+      const video = videoRef.current;
+      if (!video) return;
+
+      const reader = new BrowserMultiFormatReader();
+      reader
+        .decodeFromVideoDevice(null, video, (result) => {
+          if (!result || settled.current) return;
+          settled.current = true;
+          controls?.stop();
+          onDetected(result.getText());
+        })
+        .then((c) => {
+          controls = c as unknown as { stop: () => void };
+        })
+        .catch(() => {
+          if (!cancelled) setCameraError('Camera unavailable. Enter the barcode numbers below instead.');
+        });
+    });
+
+    return () => {
+      cancelled = true;
+      try {
+        controls?.stop();
+      } catch {
+        // The stream may already be closed by the browser.
+      }
+    };
+  }, [onDetected]);
+
+  return (
+    <Modal title="Scan a barcode" eyebrow="Open Food Facts" onClose={onClose}>
+      <div className="space-y-4">
+        <div className="relative aspect-[4/3] overflow-hidden rounded-2xl border border-border bg-secondary/45">
+          <video ref={videoRef} className="h-full w-full object-cover" muted playsInline />
+          <div className="pointer-events-none absolute inset-0 grid place-items-center">
+            <div className="h-28 w-[78%] rounded-xl border-2 border-primary/70 shadow-[0_0_0_9999px_rgba(0,0,0,0.25)]" />
+          </div>
+        </div>
+        {cameraError ? <p className="text-xs font-semibold text-destructive" role="status">{cameraError}</p> : null}
+        <Field label="Or type the numbers">
+          <div className="flex gap-2">
+            <input
+              inputMode="numeric"
+              autoComplete="off"
+              value={manual}
+              onChange={(e) => setManual(e.target.value.replace(/\D/g, '').slice(0, 14))}
+              placeholder="e.g. 5449000000996"
+              className={inputClass}
+              data-testid="input-barcode-manual"
+            />
+            <button
+              type="button"
+              disabled={manual.length < 8}
+              onClick={() => { if (manual.length >= 8) onDetected(manual); }}
+              className="focus-ring h-11 shrink-0 rounded-xl bg-primary px-4 text-sm font-bold text-primary-foreground transition hover:brightness-105 disabled:opacity-40"
+              data-testid="button-barcode-manual-submit"
+            >
+              Look up
+            </button>
+          </div>
+        </Field>
+        <p className="text-[11px] leading-relaxed text-muted-foreground">
+          Nutrition data from{' '}
+          <a href="https://world.openfoodfacts.org" target="_blank" rel="noreferrer" className="font-semibold text-primary underline">Open Food Facts</a>, licensed under ODbL.
+        </p>
+      </div>
+    </Modal>
+  );
+}
+
 const activityTargetMap: Record<string, string[]> = {
   Strength: ['chest', 'back', 'shoulders', 'biceps', 'triceps', 'quads', 'hamstrings', 'glutes'],
   Run: ['quads', 'hamstrings', 'calves', 'glutes'],
@@ -153,6 +239,8 @@ export function MealDialog({ meal, onClose, onSave, savedMeals = [], onSaveFavor
   const [error, setError] = useState('');
   const [looking, setLooking] = useState(false);
   const [lookupError, setLookupError] = useState('');
+  const [lookupSource, setLookupSource] = useState<{ label: string; basis: string | null } | null>(null);
+  const [scanning, setScanning] = useState(false);
 
   useEffect(() => {
     setForm({
@@ -166,6 +254,9 @@ export function MealDialog({ meal, onClose, onSave, savedMeals = [], onSaveFavor
       fat: meal?.fat ?? 0,
       imageDataUrl: meal?.imageDataUrl,
     });
+    setLookupSource(null);
+    setLookupError('');
+    setScanning(false);
   }, [meal]);
 
   const set = (key: keyof typeof form, value: string | number | MealType | undefined) => setForm((current) => ({ ...current, [key]: value }));
@@ -193,30 +284,30 @@ export function MealDialog({ meal, onClose, onSave, savedMeals = [], onSaveFavor
     };
     reader.readAsDataURL(file);
   };
-  const handleNutritionLookup = async () => {
-    if (!form.name.trim()) return;
+  const handleBarcodeLookup = async (code: string) => {
+    setScanning(false);
     setLooking(true);
     setLookupError('');
+    setLookupSource(null);
     try {
-      const res = await fetch('https://everyone.food/api/calories', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ meal: form.name.trim() }),
-      });
-      const data = await res.json();
-      if (data.totals) {
-        setForm((current) => ({
-          ...current,
-          calories: Math.round(data.totals.calories ?? current.calories),
-          protein: Math.round(data.totals.protein ?? current.protein),
-          carbs: Math.round(data.totals.carbs ?? current.carbs),
-          fat: Math.round(data.totals.fat ?? current.fat),
-        }));
-      } else {
-        setLookupError('Food not found — enter values manually.');
+      const data = await lookupBarcode(code);
+      const { product, totals } = data;
+      if (product.noNutritionData) {
+        setForm((current) => ({ ...current, name: current.name.trim() || product.name }));
+        setLookupSource({ label: `${product.name} — no nutrition data on file`, basis: null });
+        return;
       }
-    } catch {
-      setLookupError('Could not reach nutrition API — try again.');
+      setForm((current) => ({
+        ...current,
+        name: current.name.trim() || product.name,
+        calories: totals.calories,
+        protein: totals.protein,
+        carbs: totals.carbs,
+        fat: totals.fat,
+      }));
+      setLookupSource({ label: product.name, basis: product.basis === 'serving' ? (product.servingLabel ?? '1 serving') : 'per 100 g' });
+    } catch (error) {
+      setLookupError(error instanceof Error ? error.message : 'Could not look up that barcode.');
     } finally {
       setLooking(false);
     }
@@ -233,6 +324,7 @@ export function MealDialog({ meal, onClose, onSave, savedMeals = [], onSaveFavor
   };
 
   return (
+    <>
     <Modal title={meal ? 'Edit meal' : 'Add a meal'} eyebrow="Manual nutrition log" onClose={onClose}>
       <form onSubmit={submit} className="space-y-3 sm:space-y-5">
         {savedMeals.length > 0 && !meal && (
@@ -268,14 +360,20 @@ export function MealDialog({ meal, onClose, onSave, savedMeals = [], onSaveFavor
         <div className="rounded-2xl border border-border bg-background/70 p-3 sm:p-4">
           <div className="mb-2 flex items-center justify-between sm:mb-3">
             <div><p className="text-sm font-bold">Nutrition facts</p><p className="text-[11px] text-muted-foreground sm:text-xs">Auto-fill or enter manually.</p></div>
-            <span className="rounded-full bg-accent/35 px-2 py-0.5 font-mono-ui text-[10px] font-medium text-foreground">Manual</span>
+            <span className="rounded-full bg-accent/35 px-2 py-0.5 font-mono-ui text-[10px] font-medium text-foreground" data-testid="nutrition-source-badge">{lookupSource ? 'Scanned' : 'Manual'}</span>
           </div>
           <div className="mb-2 sm:mb-3">
-            <button type="button" onClick={handleNutritionLookup} disabled={looking || !form.name.trim()} className="focus-ring w-full h-9 rounded-xl bg-primary px-4 text-xs font-bold text-primary-foreground transition hover:brightness-105 disabled:opacity-40 disabled:cursor-not-allowed sm:h-10 sm:text-sm" data-testid="button-nutrition-lookup">
-              {looking ? 'Looking up...' : 'Auto-fill from food name'}
+            <button type="button" onClick={() => setScanning(true)} disabled={looking} className="focus-ring w-full h-9 rounded-xl bg-primary px-4 text-xs font-bold text-primary-foreground transition hover:brightness-105 disabled:opacity-40 disabled:cursor-not-allowed sm:h-10 sm:text-sm" data-testid="button-scan-barcode">
+              <span className="inline-flex items-center gap-2"><ScanLine size={15} /> {looking ? 'Looking up...' : 'Scan barcode to fill'}</span>
             </button>
           </div>
-          {lookupError ? <p className="mb-2 text-xs text-destructive" role="status">{lookupError}</p> : null}
+          {lookupError ? <p className="mb-2 text-xs text-destructive" role="status" data-testid="status-barcode-error">{lookupError}</p> : null}
+          {lookupSource ? (
+            <p className="mb-2 text-[11px] text-muted-foreground sm:text-xs" role="status" data-testid="status-barcode-source">
+              Filled from <span className="font-semibold text-foreground">{lookupSource.label}</span>
+              {lookupSource.basis ? <span> · {lookupSource.basis}</span> : null} · check before saving
+            </p>
+          ) : null}
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3">
             <Field label="Calories"><input type="number" min="0" max="99999" value={form.calories} onChange={(event) => set('calories', Number(event.target.value))} className={inputClass} data-testid="input-meal-calories" /></Field>
             <Field label="Protein · g"><input type="number" min="0" max="9999" value={form.protein} onChange={(event) => set('protein', Number(event.target.value))} className={inputClass} data-testid="input-meal-protein" /></Field>
@@ -312,6 +410,8 @@ export function MealDialog({ meal, onClose, onSave, savedMeals = [], onSaveFavor
         </div>
       </form>
     </Modal>
+    {scanning ? <BarcodeScanner onClose={() => setScanning(false)} onDetected={handleBarcodeLookup} /> : null}
+    </>
   );
 }
 

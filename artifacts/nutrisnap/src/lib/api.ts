@@ -122,17 +122,51 @@ interface ResetRequestResponse {
 }
 
 export async function requestPasswordReset(email: string) {
-  return apiFetch<ResetRequestResponse>('/api/auth/forgot-password', {
+  return apiFetch<ResetRequestResponse>('/api/auth/password', {
     method: 'POST',
-    body: JSON.stringify({ email }),
+    body: JSON.stringify({ action: 'forgot', email }),
   });
 }
 
 export async function resetPassword(token: string, password: string) {
-  return apiFetch<OkResponse>('/api/auth/reset-password', {
+  return apiFetch<OkResponse>('/api/auth/password', {
     method: 'POST',
-    body: JSON.stringify({ token, password }),
+    body: JSON.stringify({ action: 'reset', token, password }),
   });
+}
+
+// ── Barcode lookup (Open Food Facts) ────────────────────────────────────────
+
+export interface BarcodeMacros {
+  calories: number | null;
+  protein: number | null;
+  carbs: number | null;
+  fat: number | null;
+}
+
+export interface BarcodeProduct {
+  code: string;
+  name: string;
+  brands: string;
+  imageUrl: string | null;
+  quantity: string | null;
+  basis: 'serving' | '100g';
+  servingLabel: string | null;
+  servingGrams: number | null;
+  per100g: BarcodeMacros;
+  perServing: BarcodeMacros | null;
+  display: BarcodeMacros;
+  noNutritionData: boolean;
+}
+
+interface BarcodeLookupResponse {
+  source: string;
+  product: BarcodeProduct;
+  totals: { calories: number; protein: number; carbs: number; fat: number };
+}
+
+export async function lookupBarcode(code: string) {
+  return apiFetch<BarcodeLookupResponse>(`/api/nutrition?code=${encodeURIComponent(code)}`);
 }
 
 // ── Water ──────────────────────────────────────────────────────────────────

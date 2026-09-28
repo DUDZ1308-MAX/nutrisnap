@@ -1,9 +1,10 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { getDb, eq, generateResetToken, hashResetToken, sendPasswordResetEmail, RESET_TOKEN_TTL_MS } from "../_lib.js";
+import { getDb, bcrypt, eq, and, isNull, gt, generateResetToken, hashResetToken, sendPasswordResetEmail, clearAuthCookie, RESET_TOKEN_TTL_MS } from "../_lib.js";
 import { usersTable, passwordResetTokensTable } from "../../lib/db/src/schema/index.js";
 import crypto from "crypto";
 
 const GENERIC_MESSAGE = "If an account exists for that email, a reset link is on its way.";
+const INVALID_LINK = "This reset link is invalid or has expired.";
 
 // Best-effort throttle. Serverless instances are not shared, so this only limits
 // bursts against a single warm instance; it is a layer of defence, not the primary control.
@@ -22,12 +23,7 @@ function isThrottled(key: string): boolean {
   return record.count > MAX_ATTEMPTS;
 }
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
-  if (req.method !== "POST") {
-    res.setHeader("Allow", "POST");
-    return res.status(405).json({ error: "Method not allowed" });
-  }
-
+async function handleForgotPassword(req: VercelRequest, res: VercelResponse) {
   const email = typeof req.body?.email === "string" ? req.body.email.trim().toLowerCase() : "";
   const key = `${email}:${req.headers["x-forwarded-for"] ?? "unknown"}`;
 
@@ -64,4 +60,64 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   return res.status(200).json({ ok: true, message: GENERIC_MESSAGE });
+}
+
+async function handleResetPassword(req: VercelRequest, res: VercelResponse) {
+  const token = typeof req.body?.token === "string" ? req.body.token.trim() : "";
+  const password = typeof req.body?.password === "string" ? req.body.password : "";
+
+  if (token.length < 32) {
+    return res.status(400).json({ error: INVALID_LINK });
+  }
+  if (password.length < 8 || password.length > 100) {
+    return res.status(400).json({ error: "Password must be between 8 and 100 characters" });
+  }
+
+  const db = getDb();
+  const now = new Date();
+
+  const matches = await db
+    .select()
+    .from(passwordResetTokensTable)
+    .where(
+      and(
+        eq(passwordResetTokensTable.tokenHash, hashResetToken(token)),
+        isNull(passwordResetTokensTable.usedAt),
+        gt(passwordResetTokensTable.expiresAt, now),
+      ),
+    )
+    .limit(1);
+
+  if (matches.length === 0) {
+    return res.status(400).json({ error: INVALID_LINK });
+  }
+
+  const record = matches[0];
+
+  await db
+    .update(usersTable)
+    .set({ passwordHash: await bcrypt.hash(password, 12) })
+    .where(eq(usersTable.id, record.userId));
+
+  // Burn the token and drop any other outstanding links for this account.
+  await db.delete(passwordResetTokensTable).where(eq(passwordResetTokensTable.userId, record.userId));
+
+  // The password changed, so drop this browser's session cookie.
+  clearAuthCookie(res);
+
+  return res.status(200).json({ ok: true });
+}
+
+export default async function handler(req: VercelRequest, res: VercelResponse) {
+  if (req.method !== "POST") {
+    res.setHeader("Allow", "POST");
+    return res.status(405).json({ error: "Method not allowed" });
+  }
+
+  const action = typeof req.body?.action === "string" ? req.body.action : "";
+
+  if (action === "forgot") return handleForgotPassword(req, res);
+  if (action === "reset") return handleResetPassword(req, res);
+
+  return res.status(400).json({ error: "Unknown action" });
 }
