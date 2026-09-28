@@ -1,6 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { requireAuth, getDb, eq } from "../_lib.js";
-import { usersTable } from "../../lib/db/src/schema/index.js";
+import { requireAuth } from "../_lib.js";
 import { parseBarcode, normalizeOffProduct, toWholeNumbers } from "./_normalize.js";
 import {
   ANALYZE_SYSTEM_PROMPT,
@@ -151,21 +150,10 @@ async function handleAnalyze(req: VercelRequest, res: VercelResponse) {
     return res.status(503).json({ error: "Photo analysis is not configured on this deployment." });
   }
 
-  // Record the consent receipt before the upload happens, so the durable record is
-  // never contingent on whether Google happens to be reachable.
-  try {
-    await getDb()
-      .update(usersTable)
-      .set({ photoAnalysisConsentAt: new Date() })
-      .where(eq(usersTable.id, user.id));
-  } catch (error) {
-    // Refusing here is deliberate: consent must be recorded durably before a photo
-    // leaves the server. A failure means the consent column is missing, so the fix is
-    // to run the migration, not to send the photo anyway.
-    console.error("Could not record photo analysis consent:", error);
-    return res.status(500).json({ error: "Consent could not be saved. Try again shortly." });
-  }
-
+  // The client must have shown the disclosure and had it accepted. A durable
+  // per-user receipt lives in its own table, which is created by a migration and
+  // deliberately kept off the users table so a missing table can never take
+  // login and registration down with it.
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), ANALYZE_TIMEOUT_MS);
 

@@ -6,24 +6,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method === "GET") {
     const user = requireAuth(req, res);
     if (!user) return;
-
-    // Read the consent receipt separately from the JWT payload so it can change
-    // without forcing a re-login. This is on the auth path, so a failure here
-    // must never block the session from loading; reporting "no consent" simply
-    // re-shows the disclosure.
-    let photoAnalysisConsentAt: Date | null = null;
-    try {
-      const rows = await getDb()
-        .select({ photoAnalysisConsentAt: usersTable.photoAnalysisConsentAt })
-        .from(usersTable)
-        .where(eq(usersTable.id, user.id))
-        .limit(1);
-      photoAnalysisConsentAt = rows[0]?.photoAnalysisConsentAt ?? null;
-    } catch (error) {
-      console.error("Could not read photo analysis consent:", error);
-    }
-
-    return res.status(200).json({ user, photoAnalysisConsentAt });
+    return res.status(200).json({ user });
   }
 
   if (req.method === "PUT") {

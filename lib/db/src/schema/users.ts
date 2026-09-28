@@ -11,9 +11,6 @@ export const usersTable = pgTable("users", {
   height: integer("height"),
   weight: real("weight"),
   units: text("units").notNull().default("kg"),
-  // Set the first time a user agrees to send a meal photo to Google for analysis.
-  // Null means consent has never been given, so the disclosure must be shown again.
-  photoAnalysisConsentAt: timestamp("photo_analysis_consent_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
@@ -25,8 +22,6 @@ export const insertUserSchema = createInsertSchema(usersTable).omit({
   id: true,
   createdAt: true,
   passwordHash: true,
-  // Consent is only ever set by the photo analysis route, never from user input.
-  photoAnalysisConsentAt: true,
 });
 
 export const registerSchema = z.object({
