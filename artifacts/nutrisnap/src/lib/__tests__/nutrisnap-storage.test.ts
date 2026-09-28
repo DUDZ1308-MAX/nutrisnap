@@ -7,11 +7,78 @@ import {
   exportData,
   parseImport,
   workoutTargetAreas,
+  formatWeight,
+  formatWeightInput,
+  kgToUnit,
+  unitToKg,
+  weightUnitLabel,
   type Meal,
   type Workout,
   type Goals,
   type NutriSnapExport,
 } from "../nutrisnap-storage";
+
+describe("weight unit conversion", () => {
+  it("passes kilogram values through unchanged", () => {
+    expect(kgToUnit(70, "kg")).toBe(70);
+    expect(unitToKg(70, "kg")).toBe(70);
+  });
+
+  it("converts kilograms to pounds", () => {
+    expect(kgToUnit(70, "lb")).toBeCloseTo(154.3, 1);
+  });
+
+  it("converts pounds to kilograms", () => {
+    expect(unitToKg(154.5, "lb")).toBeCloseTo(70.1, 1);
+  });
+
+  it("round-trips through both units without meaningful drift", () => {
+    const original = 72.4;
+    expect(unitToKg(kgToUnit(original, "lb"), "lb")).toBeCloseTo(original, 6);
+  });
+
+  it("keeps the physical value stable when switching units", () => {
+    const weightKg = 70.04;
+    const inPounds = kgToUnit(weightKg, "lb")!;
+    expect(unitToKg(inPounds, "lb")).toBeCloseTo(weightKg, 6);
+  });
+
+  it("preserves fractional pounds that an integer column would truncate", () => {
+    const typed = 154.5;
+    const stored = unitToKg(typed, "lb")!;
+    expect(Number.isInteger(stored)).toBe(false);
+    expect(kgToUnit(stored, "lb")).toBeCloseTo(typed, 6);
+  });
+
+  it("returns null for empty or invalid values", () => {
+    expect(kgToUnit(null, "kg")).toBeNull();
+    expect(kgToUnit(undefined, "lb")).toBeNull();
+    expect(kgToUnit(Number.NaN, "kg")).toBeNull();
+    expect(unitToKg(null, "lb")).toBeNull();
+    expect(unitToKg(Number.NaN, "kg")).toBeNull();
+  });
+
+  it("labels units for display", () => {
+    expect(weightUnitLabel("kg")).toBe("kg");
+    expect(weightUnitLabel("lb")).toBe("lb");
+  });
+
+  it("formats a weight with its unit", () => {
+    expect(formatWeight(70, "kg")).toBe("70.0 kg");
+    expect(formatWeight(70, "lb")).toBe("154.3 lb");
+  });
+
+  it("formats a missing weight as a dash", () => {
+    expect(formatWeight(null, "kg")).toBe("—");
+  });
+
+  it("trims trailing zeros for number inputs", () => {
+    expect(formatWeightInput(70)).toBe("70");
+    expect(formatWeightInput(154.3)).toBe("154.3");
+    expect(formatWeightInput(154.30000000000001)).toBe("154.3");
+    expect(formatWeightInput(null)).toBe("");
+  });
+});
 
 describe("todayKey", () => {
   it("returns a YYYY-MM-DD string", () => {

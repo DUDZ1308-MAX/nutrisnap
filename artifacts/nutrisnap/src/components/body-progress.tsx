@@ -1,11 +1,13 @@
 import { useState, useRef } from "react";
 import { Camera, Trash2, X } from "lucide-react";
 import type { BodyPhoto } from "@/lib/nutrisnap-storage";
-import { todayKey } from "@/lib/nutrisnap-storage";
+import { todayKey, formatWeight, formatWeightInput, kgToUnit, unitToKg, weightUnitLabel, type WeightUnit } from "@/lib/nutrisnap-storage";
 
 interface BodyProgressProps {
   photos: BodyPhoto[];
+  /** Canonical kilogram value from the profile. */
   userWeight?: number | null;
+  unit: WeightUnit;
   onAdd: (photo: { date: string; weight?: number; imageDataUrl: string; notes?: string }) => Promise<BodyPhoto>;
   onDelete: (id: string) => Promise<void>;
 }
@@ -30,10 +32,10 @@ function resizeImage(file: File, maxWidth = 400): Promise<string> {
   });
 }
 
-export function BodyProgress({ photos, userWeight, onAdd, onDelete }: BodyProgressProps) {
+export function BodyProgress({ photos, userWeight, unit, onAdd, onDelete }: BodyProgressProps) {
   const [showUpload, setShowUpload] = useState(false);
   const [preview, setPreview] = useState<string | null>(null);
-  const [weight, setWeight] = useState<string>(userWeight?.toString() || "");
+  const [weight, setWeight] = useState<string>(formatWeightInput(kgToUnit(userWeight, unit)));
   const [notes, setNotes] = useState("");
   const [uploading, setUploading] = useState(false);
   const [selectedPhoto, setSelectedPhoto] = useState<BodyPhoto | null>(null);
@@ -54,13 +56,13 @@ export function BodyProgress({ photos, userWeight, onAdd, onDelete }: BodyProgre
       const today = todayKey();
       await onAdd({
         date: today,
-        weight: weight ? Number(weight) : undefined,
+        weight: unitToKg(weight ? Number(weight) : null, unit) ?? undefined,
         imageDataUrl: preview,
         notes: notes || undefined,
       });
       setShowUpload(false);
       setPreview(null);
-      setWeight(userWeight?.toString() || "");
+      setWeight(formatWeightInput(kgToUnit(userWeight, unit)));
       setNotes("");
     } catch (err) {
       console.error("Failed to save photo:", err);
@@ -114,12 +116,15 @@ export function BodyProgress({ photos, userWeight, onAdd, onDelete }: BodyProgre
             <img src={preview} alt="Preview" className="w-full rounded-xl object-cover max-h-64" />
             <div className="mt-4 space-y-3">
               <div>
-                <label className="text-xs font-medium text-muted-foreground">Weight (kg, optional)</label>
+                <label className="text-xs font-medium text-muted-foreground">Weight ({weightUnitLabel(unit)}, optional)</label>
                 <input
                   type="number"
+                  step="any"
+                  min="1"
+                  max={unit === "lb" ? 1100 : 500}
                   value={weight}
                   onChange={(e) => setWeight(e.target.value)}
-                  placeholder="e.g. 75"
+                  placeholder={unit === "lb" ? "e.g. 154" : "e.g. 70"}
                   className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
                 />
               </div>
@@ -166,7 +171,7 @@ export function BodyProgress({ photos, userWeight, onAdd, onDelete }: BodyProgre
             <div className="mt-3 flex items-center justify-between rounded-xl bg-background/90 px-4 py-3 text-sm">
               <div>
                 <span className="font-medium">{selectedPhoto.date}</span>
-                {selectedPhoto.weight != null && <span className="ml-2 text-muted-foreground">{selectedPhoto.weight} kg</span>}
+                {selectedPhoto.weight != null && <span className="ml-2 text-muted-foreground">{formatWeight(selectedPhoto.weight, unit)}</span>}
                 {selectedPhoto.notes && <span className="ml-2 text-muted-foreground italic">"{selectedPhoto.notes}"</span>}
               </div>
               <button onClick={() => handleDelete(selectedPhoto.id)} className="text-destructive hover:text-destructive/80">
@@ -194,7 +199,7 @@ export function BodyProgress({ photos, userWeight, onAdd, onDelete }: BodyProgre
               )}
               <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 to-transparent p-1.5 opacity-0 transition group-hover:opacity-100">
                 <p className="text-[10px] font-medium text-white">{photo.date}</p>
-                {photo.weight != null && <p className="text-[10px] text-white/80">{photo.weight} kg</p>}
+                {photo.weight != null && <p className="text-[10px] text-white/80">{formatWeight(photo.weight, unit)}</p>}
               </div>
             </button>
           ))}

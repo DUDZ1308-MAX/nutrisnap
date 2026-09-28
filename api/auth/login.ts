@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { getDb, bcrypt, signToken, setAuthCookie } from "../lib.js";
+import { getDb, bcrypt, signToken, setAuthCookie, normalizeUnits } from "../lib.js";
 import { usersTable } from "../../lib/db/src/schema/index.js";
 import { eq } from "drizzle-orm";
 import { loginSchema } from "../../lib/db/src/schema/users.js";
@@ -29,7 +29,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(401).json({ error: "Invalid email or password" });
   }
 
-  const profile = { id: user.id, email: user.email, username: user.username, age: user.age ?? null, height: user.height ?? null, weight: user.weight ?? null };
+  const profile = { id: user.id, email: user.email, username: user.username, age: user.age ?? null, height: user.height ?? null, weight: user.weight ?? null, units: normalizeUnits(user.units) };
   const token = signToken(profile);
   setAuthCookie(res, token);
 

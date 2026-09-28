@@ -71,6 +71,47 @@ export type SavedMeal = { id: string; name: string; mealType: string; calories: 
 
 export type BodyPhoto = { id: string; date: string; weight?: number; imageDataUrl?: string; notes?: string };
 
+// ── Weight units ───────────────────────────────────────────────────────────
+//
+// Weights are stored canonically in kilograms (database, API and auth token).
+// `units` is a display/input preference only, so every calculation downstream
+// (BMI, BMR, calories burned) keeps working on kilograms regardless of what the
+// user prefers to see. Conversion happens only at the input/display boundary.
+
+export type WeightUnit = 'kg' | 'lb';
+
+export const weightUnits: WeightUnit[] = ['kg', 'lb'];
+
+const KG_PER_LB = 0.45359237;
+
+export function weightUnitLabel(unit: WeightUnit): string {
+  return unit === 'lb' ? 'lb' : 'kg';
+}
+
+/** Convert a canonical kilogram value into the user's preferred display unit. */
+export function kgToUnit(kg: number | null | undefined, unit: WeightUnit): number | null {
+  if (kg == null || Number.isNaN(kg)) return null;
+  return unit === 'lb' ? kg / KG_PER_LB : kg;
+}
+
+/** Convert a value the user typed in their preferred unit back to kilograms. */
+export function unitToKg(value: number | null | undefined, unit: WeightUnit): number | null {
+  if (value == null || Number.isNaN(value)) return null;
+  return unit === 'lb' ? value * KG_PER_LB : value;
+}
+
+/** Format a kilogram value for display, e.g. `70.0 kg` or `154.3 lb`. */
+export function formatWeight(kg: number | null | undefined, unit: WeightUnit): string {
+  const value = kgToUnit(kg, unit);
+  return value == null ? '—' : `${value.toFixed(1)} ${weightUnitLabel(unit)}`;
+}
+
+/** Trim trailing zeros for use in a number input, e.g. `154.30` becomes `154.3`. */
+export function formatWeightInput(value: number | null): string {
+  if (value == null || Number.isNaN(value)) return '';
+  return String(Math.round(value * 100) / 100);
+}
+
 // ── Defaults ───────────────────────────────────────────────────────────────
 
 export const defaultGoals: Goals = {

@@ -32,8 +32,10 @@ import { Toaster } from '@/components/ui/toaster';
 import NotFound from '@/pages/not-found';
 import LoginPage from '@/pages/login';
 import RegisterPage from '@/pages/register';
-import { AuthProvider, useAuth } from '@/lib/auth-context';
-import { todayKey, dateKey, useNutriSnap, workoutTargetAreas, exportData, downloadExport, parseImport, type Goals, type Meal, type Workout } from '@/lib/nutrisnap-storage';
+import ForgotPasswordPage from '@/pages/forgot-password';
+import ResetPasswordPage from '@/pages/reset-password';
+import { AuthProvider, useAuth, type AuthUser } from '@/lib/auth-context';
+import { todayKey, dateKey, useNutriSnap, workoutTargetAreas, exportData, downloadExport, parseImport, formatWeightInput, kgToUnit, unitToKg, weightUnitLabel, weightUnits, type Goals, type Meal, type Workout, type WeightUnit } from '@/lib/nutrisnap-storage';
 import { MuscleMap } from '@/components/muscle-map';
 import { WaterTracker } from '@/components/water-tracker';
 import { WeeklySummary } from '@/components/weekly-summary';
@@ -99,6 +101,8 @@ function AppRoutes() {
     <Switch>
       <Route path="/login"><LoginPage /></Route>
       <Route path="/register"><RegisterPage /></Route>
+      <Route path="/forgot-password"><ForgotPasswordPage /></Route>
+      <Route path="/reset-password"><ResetPasswordPage /></Route>
       <Route>{user ? <AuthenticatedApp /> : <LoginPage />}</Route>
       <Route component={NotFound} />
     </Switch>
@@ -135,6 +139,14 @@ function Overview({ data, onAddMeal, onAddWorkout, onEditMeal, onEditWorkout, on
   const todayWorkouts = useMemo(() => data.workouts.filter((workout) => workout.date === today), [data.workouts, today]);
   const totals = todayMeals.reduce((sum, meal) => ({ calories: sum.calories + meal.calories, protein: sum.protein + meal.protein, carbs: sum.carbs + meal.carbs, fat: sum.fat + meal.fat }), { calories: 0, protein: 0, carbs: 0, fat: 0 });
   const caloriesLeft = Math.max(0, data.goals.calories - totals.calories);
+  const units = user?.units ?? 'kg';
+  const weightHistory = useMemo(() => {
+    const points = data.bodyPhotos
+      .filter((photo) => typeof photo.weight === 'number')
+      .map((photo) => ({ date: photo.date, weight: photo.weight as number }));
+    if (typeof user?.weight === 'number') points.push({ date: today, weight: user.weight });
+    return points;
+  }, [data.bodyPhotos, user?.weight, today]);
   return (
     <div className="mx-auto max-w-[1320px] px-4 py-5 sm:px-8 lg:px-12 lg:py-12">
       <section className="relative overflow-hidden rounded-[24px] bg-sidebar px-5 py-5 text-sidebar-foreground shadow-[0_22px_55px_-28px_hsl(165_28%_15%/.6)] sm:rounded-[30px] sm:px-9 sm:py-10 lg:px-12 lg:py-11">
@@ -189,9 +201,9 @@ function Overview({ data, onAddMeal, onAddWorkout, onEditMeal, onEditWorkout, on
         <RestTimer />
       </div>
 
-      <TrendChart meals={data.meals} workouts={data.workouts} />
+      <TrendChart meals={data.meals} workouts={data.workouts} weightHistory={weightHistory} unit={units} />
 
-      <BodyProgress photos={data.bodyPhotos} userWeight={user?.weight} onAdd={data.addBodyPhoto} onDelete={data.deleteBodyPhoto} />
+      <BodyProgress photos={data.bodyPhotos} userWeight={user?.weight} unit={units} onAdd={data.addBodyPhoto} onDelete={data.deleteBodyPhoto} />
 
       <div className="mt-5 grid gap-5 sm:grid-cols-3">
         <WaterTracker totalMl={data.waterTotalMl} goalMl={data.goals.waterMl} entries={data.waterEntries} onAdd={(amountMl) => data.addWater(amountMl)} onRemove={(id) => data.deleteWater(id)} />
@@ -333,7 +345,7 @@ function HealthRating({ totals, goals, todayMeals, todayWorkouts }: { totals: { 
   );
 }
 
-function HealthStats({ user, goals }: { user: { age: number | null; height: number | null; weight: number | null } | null; goals: Goals }) {
+function HealthStats({ user, goals }: { user: Pick<AuthUser, 'age' | 'height' | 'weight'> | null; goals: Goals }) {
   const stats = useMemo(() => {
     if (!user?.age || !user?.height || !user?.weight) return null;
     const heightM = user.height / 100;
@@ -454,7 +466,12 @@ function SettingsPage({ data }: { data: Data }) {
   const { user, logout, updateProfile } = useAuth();
   const [form, setForm] = useState<Goals>(data.goals);
   const [saved, setSaved] = useState(false);
-  const [profileForm, setProfileForm] = useState({ age: user?.age ?? '', height: user?.height ?? '', weight: user?.weight ?? '' });
+  const [profileForm, setProfileForm] = useState({
+    age: user?.age != null ? String(user.age) : '',
+    height: user?.height != null ? String(user.height) : '',
+    weight: formatWeightInput(kgToUnit(user?.weight, user?.units ?? 'kg')),
+  });
+  const [units, setUnits] = useState<WeightUnit>(user?.units ?? 'kg');
   const [profileSaved, setProfileSaved] = useState(false);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const profileTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -471,12 +488,34 @@ function SettingsPage({ data }: { data: Data }) {
     event.preventDefault();
     const age = profileForm.age !== '' ? Number(profileForm.age) : null;
     const height = profileForm.height !== '' ? Number(profileForm.height) : null;
-    const weight = profileForm.weight !== '' ? Number(profileForm.weight) : null;
-    await updateProfile(age, height, weight);
+    const weightKg = profileForm.weight !== '' ? unitToKg(Number(profileForm.weight), units) : null;
+    await updateProfile(age, height, weightKg, units);
     setProfileSaved(true);
     if (profileTimeoutRef.current) clearTimeout(profileTimeoutRef.current);
     profileTimeoutRef.current = setTimeout(() => setProfileSaved(false), 2400);
   };
+  const changeUnits = async (next: WeightUnit) => {
+    if (next === units) return;
+    const age = profileForm.age !== '' ? Number(profileForm.age) : null;
+    const height = profileForm.height !== '' ? Number(profileForm.height) : null;
+    const weightKg = profileForm.weight !== '' ? unitToKg(Number(profileForm.weight), units) : null;
+    setUnits(next);
+    setProfileForm((current) => ({ ...current, weight: formatWeightInput(kgToUnit(weightKg, next)) }));
+    try {
+      await updateProfile(age, height, weightKg, next);
+    } catch (error) {
+      console.error('Failed to save unit preference:', error);
+      setUnits(units);
+      setProfileForm((current) => ({ ...current, weight: formatWeightInput(kgToUnit(weightKg, units)) }));
+    }
+  };
+  useEffect(() => {
+    setProfileForm({
+      age: user?.age != null ? String(user.age) : '',
+      height: user?.height != null ? String(user.height) : '',
+      weight: formatWeightInput(kgToUnit(user?.weight, units)),
+    });
+  }, [user?.age, user?.height, user?.weight, units]);
   useEffect(() => () => { if (timeoutRef.current) clearTimeout(timeoutRef.current); if (profileTimeoutRef.current) clearTimeout(profileTimeoutRef.current); }, []);
   const handleExport = useCallback(() => {
     downloadExport(exportData(data.meals, data.workouts, data.goals));
@@ -501,7 +540,7 @@ function SettingsPage({ data }: { data: Data }) {
     <div className="max-w-xl"><p className="font-mono-ui text-[10px] uppercase tracking-[.22em] text-primary" data-testid="text-settings-eyebrow">Personal settings</p><h1 className="mt-2 font-display text-4xl leading-[.95] tracking-[-.055em] sm:text-5xl" data-testid="text-settings-heading">Targets that fit<br />your real life.</h1><p className="mt-4 text-sm leading-relaxed text-muted-foreground">Set the daily numbers you want to use as a helpful reference. They are not a score.</p></div>
     <div className="mt-9 grid gap-5 lg:grid-cols-[1fr_280px]">
       <div className="space-y-5">
-        <form onSubmit={submitProfile} className="rounded-[24px] border border-border bg-card p-5 shadow-sm sm:p-7"><div className="flex items-start justify-between border-b border-border pb-5"><div><h2 className="font-display text-2xl">Your profile</h2><p className="mt-1 text-xs text-muted-foreground">Used for health calculations like BMI and calorie needs.</p></div><Heart size={21} className="text-primary" /></div><div className="mt-6 grid gap-5 sm:grid-cols-3"><label className="block"><span className="mb-1.5 block text-[11px] font-bold uppercase tracking-[.12em] text-muted-foreground">Age</span><input type="number" min="1" max="150" value={profileForm.age} onChange={(event) => setProfile('age', event.target.value)} placeholder="e.g. 28" className="focus-ring h-11 w-full rounded-xl border border-input bg-background px-3.5 text-sm text-foreground outline-none transition placeholder:text-muted-foreground/60 focus:border-primary focus:ring-2 focus:ring-primary/10" data-testid="input-profile-age" /></label><label className="block"><span className="mb-1.5 block text-[11px] font-bold uppercase tracking-[.12em] text-muted-foreground">Height · cm</span><input type="number" min="1" max="300" value={profileForm.height} onChange={(event) => setProfile('height', event.target.value)} placeholder="e.g. 175" className="focus-ring h-11 w-full rounded-xl border border-input bg-background px-3.5 text-sm text-foreground outline-none transition placeholder:text-muted-foreground/60 focus:border-primary focus:ring-2 focus:ring-primary/10" data-testid="input-profile-height" /></label><label className="block"><span className="mb-1.5 block text-[11px] font-bold uppercase tracking-[.12em] text-muted-foreground">Weight · kg</span><input type="number" min="1" max="500" value={profileForm.weight} onChange={(event) => setProfile('weight', event.target.value)} placeholder="e.g. 70" className="focus-ring h-11 w-full rounded-xl border border-input bg-background px-3.5 text-sm text-foreground outline-none transition placeholder:text-muted-foreground/60 focus:border-primary focus:ring-2 focus:ring-primary/10" data-testid="input-profile-weight" /></label></div><div className="mt-7 flex flex-col items-stretch gap-3 border-t border-border pt-5 sm:flex-row sm:items-center sm:justify-between"><p className="text-xs text-muted-foreground">Saved to your account.</p><button type="submit" data-testid="button-save-profile" className="focus-ring inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-primary px-5 text-sm font-bold text-primary-foreground transition hover:brightness-105">{profileSaved ? <><Sparkles size={15} /> Saved</> : 'Save profile'}</button></div></form>
+        <form onSubmit={submitProfile} className="rounded-[24px] border border-border bg-card p-5 shadow-sm sm:p-7"><div className="flex items-start justify-between border-b border-border pb-5"><div><h2 className="font-display text-2xl">Your profile</h2><p className="mt-1 text-xs text-muted-foreground">Used for health calculations like BMI and calorie needs.</p></div><Heart size={21} className="text-primary" /></div><div className="mt-6 grid gap-5 sm:grid-cols-3"><div className="flex items-center justify-between gap-4 rounded-xl border border-border bg-background/55 px-4 py-3 sm:col-span-3"><span><span className="block text-[11px] font-bold uppercase tracking-[.12em] text-muted-foreground">Weight units</span><span className="mt-1 block text-xs text-muted-foreground">Applies everywhere you see or enter a weight. Health maths stays exact.</span></span><span className="flex shrink-0 gap-1 rounded-xl bg-muted p-1">{weightUnits.map((option) => <button key={option} type="button" onClick={() => changeUnits(option)} data-testid={`button-units-${option}`} aria-pressed={units === option} className={`focus-ring rounded-lg px-3 py-1.5 text-xs font-bold transition ${units === option ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}>{option.toUpperCase()}</button>)}</span></div><label className="block"><span className="mb-1.5 block text-[11px] font-bold uppercase tracking-[.12em] text-muted-foreground">Age</span><input type="number" min="1" max="150" value={profileForm.age} onChange={(event) => setProfile('age', event.target.value)} placeholder="e.g. 28" className="focus-ring h-11 w-full rounded-xl border border-input bg-background px-3.5 text-sm text-foreground outline-none transition placeholder:text-muted-foreground/60 focus:border-primary focus:ring-2 focus:ring-primary/10" data-testid="input-profile-age" /></label><label className="block"><span className="mb-1.5 block text-[11px] font-bold uppercase tracking-[.12em] text-muted-foreground">Height · cm</span><input type="number" min="1" max="300" value={profileForm.height} onChange={(event) => setProfile('height', event.target.value)} placeholder="e.g. 175" className="focus-ring h-11 w-full rounded-xl border border-input bg-background px-3.5 text-sm text-foreground outline-none transition placeholder:text-muted-foreground/60 focus:border-primary focus:ring-2 focus:ring-primary/10" data-testid="input-profile-height" /></label><label className="block"><span className="mb-1.5 block text-[11px] font-bold uppercase tracking-[.12em] text-muted-foreground">Weight · {weightUnitLabel(units)}</span><input type="number" min="1" max={units === 'lb' ? 1100 : 500} step="any" value={profileForm.weight} onChange={(event) => setProfile('weight', event.target.value)} placeholder={units === 'lb' ? 'e.g. 154' : 'e.g. 70'} className="focus-ring h-11 w-full rounded-xl border border-input bg-background px-3.5 text-sm text-foreground outline-none transition placeholder:text-muted-foreground/60 focus:border-primary focus:ring-2 focus:ring-primary/10" data-testid="input-profile-weight" /></label></div><div className="mt-7 flex flex-col items-stretch gap-3 border-t border-border pt-5 sm:flex-row sm:items-center sm:justify-between"><p className="text-xs text-muted-foreground">Saved to your account.</p><button type="submit" data-testid="button-save-profile" className="focus-ring inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-primary px-5 text-sm font-bold text-primary-foreground transition hover:brightness-105">{profileSaved ? <><Sparkles size={15} /> Saved</> : 'Save profile'}</button></div></form>
         <form onSubmit={submit} className="rounded-[24px] border border-border bg-card p-5 shadow-sm sm:p-7"><div className="flex items-start justify-between border-b border-border pb-5"><div><h2 className="font-display text-2xl">Daily nutrition targets</h2><p className="mt-1 text-xs text-muted-foreground">Adjust these whenever your needs change.</p></div><Target size={21} className="text-primary" /></div><div className="mt-6 space-y-5"><TargetInput label="Calories" unit="kcal" value={form.calories} onChange={(value) => set('calories', value)} testId="calories" /><TargetInput label="Protein" unit="g" value={form.protein} onChange={(value) => set('protein', value)} testId="protein" /><TargetInput label="Carbohydrates" unit="g" value={form.carbs} onChange={(value) => set('carbs', value)} testId="carbs" /><TargetInput label="Fat" unit="g" value={form.fat} onChange={(value) => set('fat', value)} testId="fat" /><TargetInput label="Water" unit="ml" value={form.waterMl} onChange={(value) => set('waterMl', value)} testId="water" /></div><div className="mt-7 flex flex-col items-stretch gap-3 border-t border-border pt-5 sm:flex-row sm:items-center sm:justify-between"><p className="text-xs text-muted-foreground">Saved to your account.</p><button type="submit" data-testid="button-save-goals" className="focus-ring inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-primary px-5 text-sm font-bold text-primary-foreground transition hover:brightness-105">{saved ? <><Sparkles size={15} /> Saved</> : 'Save targets'}</button></div></form>
       </div>
       <div className="space-y-5">

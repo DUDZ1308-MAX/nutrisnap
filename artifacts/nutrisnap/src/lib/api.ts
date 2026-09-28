@@ -1,3 +1,5 @@
+import type { WeightUnit } from '@/lib/nutrisnap-storage';
+
 const API_BASE = '';
 
 interface ApiError {
@@ -20,7 +22,7 @@ async function apiFetch<T = Record<string, unknown>>(path: string, options: Requ
 }
 
 interface AuthResponse {
-  user: { id: string; email: string; username: string; age: number | null; height: number | null; weight: number | null };
+  user: { id: string; email: string; username: string; age: number | null; height: number | null; weight: number | null; units: WeightUnit };
 }
 
 interface MealsResponse {
@@ -108,8 +110,29 @@ export async function updateGoals(goals: Record<string, unknown>) {
   return apiFetch<OkResponse>('/api/goals', { method: 'PUT', body: JSON.stringify(goals) });
 }
 
-export async function updateProfile(age: number | null, height: number | null, weight: number | null) {
-  return apiFetch<AuthResponse>('/api/auth/me', { method: 'PUT', body: JSON.stringify({ age, height, weight }) });
+export async function updateProfile(age: number | null, height: number | null, weight: number | null, units: WeightUnit) {
+  return apiFetch<AuthResponse>('/api/auth/me', { method: 'PUT', body: JSON.stringify({ age, height, weight, units }) });
+}
+
+// ── Password reset ─────────────────────────────────────────────────────────
+
+interface ResetRequestResponse {
+  ok: boolean;
+  message?: string;
+}
+
+export async function requestPasswordReset(email: string) {
+  return apiFetch<ResetRequestResponse>('/api/auth/forgot-password', {
+    method: 'POST',
+    body: JSON.stringify({ email }),
+  });
+}
+
+export async function resetPassword(token: string, password: string) {
+  return apiFetch<OkResponse>('/api/auth/reset-password', {
+    method: 'POST',
+    body: JSON.stringify({ token, password }),
+  });
 }
 
 // ── Water ──────────────────────────────────────────────────────────────────

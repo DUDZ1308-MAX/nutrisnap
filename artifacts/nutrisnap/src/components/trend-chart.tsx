@@ -9,14 +9,16 @@ import {
   Legend,
   ResponsiveContainer,
 } from "recharts";
-import { dateKey } from "@/lib/nutrisnap-storage";
+import { dateKey, kgToUnit, weightUnitLabel, type WeightUnit } from "@/lib/nutrisnap-storage";
 
 type Metric = "calories" | "protein" | "carbs" | "fat" | "weight" | "workouts";
 
 interface TrendChartProps {
   meals: Array<{ date: string; calories: number; protein: number; carbs: number; fat: number }>;
   workouts: Array<{ date: string; caloriesBurned: number; durationMinutes: number }>;
+  /** Canonical kilogram values keyed by local date. */
   weightHistory?: Array<{ date: string; weight: number }>;
+  unit?: WeightUnit;
 }
 
 const METRICS: { key: Metric; label: string; color: string }[] = [
@@ -34,11 +36,13 @@ const RANGES = [
   { key: "90d", label: "90D", days: 90 },
 ];
 
-export function TrendChart({ meals, workouts, weightHistory = [] }: TrendChartProps) {
+export function TrendChart({ meals, workouts, weightHistory = [], unit = "kg" }: TrendChartProps) {
   const [selectedRange, setSelectedRange] = useState("30d");
   const [selectedMetrics, setSelectedMetrics] = useState<Metric[]>(["calories", "protein"]);
 
   const days = RANGES.find((r) => r.key === selectedRange)?.days ?? 30;
+  const weightLabel = `Weight (${weightUnitLabel(unit)})`;
+  const metrics = METRICS.map((m) => (m.key === "weight" ? { ...m, label: weightLabel } : m));
 
   const chartData = useMemo(() => {
     const now = new Date();
@@ -80,7 +84,7 @@ export function TrendChart({ meals, workouts, weightHistory = [] }: TrendChartPr
       .sort((a, b) => a.date.localeCompare(b.date))
       .forEach((w) => {
         const d = w.date.slice(0, 10);
-        if (dayMap[d]) dayMap[d].weight = w.weight;
+        if (dayMap[d]) dayMap[d].weight = kgToUnit(w.weight, unit) ?? 0;
       });
 
     // Fill weight gaps with last known
@@ -95,7 +99,7 @@ export function TrendChart({ meals, workouts, weightHistory = [] }: TrendChartPr
       ...d,
       label: new Date(d.date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" }),
     }));
-  }, [meals, workouts, weightHistory, days]);
+  }, [meals, workouts, weightHistory, days, unit]);
 
   const toggleMetric = (m: Metric) => {
     setSelectedMetrics((prev) =>
@@ -125,7 +129,7 @@ export function TrendChart({ meals, workouts, weightHistory = [] }: TrendChartPr
       </div>
 
       <div className="flex flex-wrap gap-1.5 mb-3">
-        {METRICS.map((m) => (
+        {metrics.map((m) => (
           <button
             key={m.key}
             onClick={() => toggleMetric(m.key)}
@@ -161,7 +165,7 @@ export function TrendChart({ meals, workouts, weightHistory = [] }: TrendChartPr
             }}
           />
           <Legend wrapperStyle={{ fontSize: "11px" }} />
-          {METRICS.filter((m) => selectedMetrics.includes(m.key)).map((m) => (
+          {metrics.filter((m) => selectedMetrics.includes(m.key)).map((m) => (
             <Line
               key={m.key}
               type="monotone"

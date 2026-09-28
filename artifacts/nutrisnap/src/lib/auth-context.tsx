@@ -1,13 +1,16 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import * as api from '@/lib/api';
+import type { WeightUnit } from '@/lib/nutrisnap-storage';
 
-interface AuthUser {
+export interface AuthUser {
   id: string;
   email: string;
   username: string;
   age: number | null;
   height: number | null;
+  /** Always kilograms, regardless of the user's display preference. */
   weight: number | null;
+  units: WeightUnit;
 }
 
 interface AuthContextType {
@@ -16,7 +19,7 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, username: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
-  updateProfile: (age: number | null, height: number | null, weight: number | null) => Promise<void>;
+  updateProfile: (age: number | null, height: number | null, weightKg: number | null, units: WeightUnit) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -47,8 +50,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
   };
 
-  const updateProfile = async (age: number | null, height: number | null, weight: number | null) => {
-    const data = await api.updateProfile(age, height, weight);
+  const updateProfile = async (age: number | null, height: number | null, weightKg: number | null, units: WeightUnit) => {
+    const data = await api.updateProfile(age, height, weightKg, units);
     setUser(data.user);
   };
 

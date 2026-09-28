@@ -1,4 +1,4 @@
-import { pgTable, text, integer, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, text, integer, real, timestamp } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -9,9 +9,14 @@ export const usersTable = pgTable("users", {
   passwordHash: text("password_hash").notNull(),
   age: integer("age"),
   height: integer("height"),
-  weight: integer("weight"),
+  weight: real("weight"),
+  units: text("units").notNull().default("kg"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
+
+export const weightUnits = ["kg", "lb"] as const;
+export type WeightUnit = (typeof weightUnits)[number];
+export const weightUnitSchema = z.enum(weightUnits);
 
 export const insertUserSchema = createInsertSchema(usersTable).omit({
   id: true,
