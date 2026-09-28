@@ -35,6 +35,7 @@ import RegisterPage from '@/pages/register';
 import ForgotPasswordPage from '@/pages/forgot-password';
 import ResetPasswordPage from '@/pages/reset-password';
 import { AuthProvider, useAuth, type AuthUser } from '@/lib/auth-context';
+import { deleteAccount } from '@/lib/api';
 import { todayKey, dateKey, useNutriSnap, workoutTargetAreas, exportData, downloadExport, parseImport, formatWeightInput, kgToUnit, unitToKg, weightUnitLabel, weightUnits, type Goals, type Meal, type Workout, type WeightUnit } from '@/lib/nutrisnap-storage';
 import { MuscleMap } from '@/components/muscle-map';
 import { WaterTracker } from '@/components/water-tracker';
@@ -473,8 +474,10 @@ function SettingsPage({ data }: { data: Data }) {
   });
   const [units, setUnits] = useState<WeightUnit>(user?.units ?? 'kg');
   const [profileSaved, setProfileSaved] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const profileTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const deleteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const set = (key: keyof Goals, value: string) => { setSaved(false); setForm((current) => ({ ...current, [key]: Number(value) || 0 })); };
   const setProfile = (key: string, value: string) => { setProfileSaved(false); setProfileForm((current) => ({ ...current, [key]: value })); };
   const submit = (event: FormEvent) => {
@@ -516,7 +519,7 @@ function SettingsPage({ data }: { data: Data }) {
       weight: formatWeightInput(kgToUnit(user?.weight, units)),
     });
   }, [user?.age, user?.height, user?.weight, units]);
-  useEffect(() => () => { if (timeoutRef.current) clearTimeout(timeoutRef.current); if (profileTimeoutRef.current) clearTimeout(profileTimeoutRef.current); }, []);
+  useEffect(() => () => { if (timeoutRef.current) clearTimeout(timeoutRef.current); if (profileTimeoutRef.current) clearTimeout(profileTimeoutRef.current); if (deleteTimerRef.current) clearTimeout(deleteTimerRef.current); }, []);
   const handleExport = useCallback(() => {
     downloadExport(exportData(data.meals, data.workouts, data.goals));
   }, [data.meals, data.workouts, data.goals]);
@@ -536,6 +539,20 @@ function SettingsPage({ data }: { data: Data }) {
     };
     input.click();
   }, [data]);
+  // Deletion is irreversible, so the first tap only arms the button and the
+  // second tap within a few seconds performs it.
+  const handleDeleteAccount = async () => {
+    if (!confirmingDelete) {
+      setConfirmingDelete(true);
+      if (deleteTimerRef.current) clearTimeout(deleteTimerRef.current);
+      deleteTimerRef.current = setTimeout(() => setConfirmingDelete(false), 4000);
+      return;
+    }
+    if (deleteTimerRef.current) clearTimeout(deleteTimerRef.current);
+    setConfirmingDelete(false);
+    await deleteAccount();
+    await logout();
+  };
   return <div className="mx-auto max-w-[960px] px-5 py-8 sm:px-8 lg:px-12 lg:py-12">
     <div className="max-w-xl"><p className="font-mono-ui text-[10px] uppercase tracking-[.22em] text-primary" data-testid="text-settings-eyebrow">Personal settings</p><h1 className="mt-2 font-display text-4xl leading-[.95] tracking-[-.055em] sm:text-5xl" data-testid="text-settings-heading">Targets that fit<br />your real life.</h1><p className="mt-4 text-sm leading-relaxed text-muted-foreground">Set the daily numbers you want to use as a helpful reference. They are not a score.</p></div>
     <div className="mt-9 grid gap-5 lg:grid-cols-[1fr_280px]">
@@ -544,7 +561,7 @@ function SettingsPage({ data }: { data: Data }) {
         <form onSubmit={submit} className="rounded-[24px] border border-border bg-card p-5 shadow-sm sm:p-7"><div className="flex items-start justify-between border-b border-border pb-5"><div><h2 className="font-display text-2xl">Daily nutrition targets</h2><p className="mt-1 text-xs text-muted-foreground">Adjust these whenever your needs change.</p></div><Target size={21} className="text-primary" /></div><div className="mt-6 space-y-5"><TargetInput label="Calories" unit="kcal" value={form.calories} onChange={(value) => set('calories', value)} testId="calories" /><TargetInput label="Protein" unit="g" value={form.protein} onChange={(value) => set('protein', value)} testId="protein" /><TargetInput label="Carbohydrates" unit="g" value={form.carbs} onChange={(value) => set('carbs', value)} testId="carbs" /><TargetInput label="Fat" unit="g" value={form.fat} onChange={(value) => set('fat', value)} testId="fat" /><TargetInput label="Water" unit="ml" value={form.waterMl} onChange={(value) => set('waterMl', value)} testId="water" /></div><div className="mt-7 flex flex-col items-stretch gap-3 border-t border-border pt-5 sm:flex-row sm:items-center sm:justify-between"><p className="text-xs text-muted-foreground">Saved to your account.</p><button type="submit" data-testid="button-save-goals" className="focus-ring inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-primary px-5 text-sm font-bold text-primary-foreground transition hover:brightness-105">{saved ? <><Sparkles size={15} /> Saved</> : 'Save targets'}</button></div></form>
       </div>
       <div className="space-y-5">
-        {user ? <div className="rounded-[24px] border border-border bg-card p-5"><p className="font-mono-ui text-[10px] uppercase tracking-[.18em] text-muted-foreground">Account</p><p className="mt-3 text-sm font-bold">{user.username}</p><p className="mt-1 text-xs text-muted-foreground">{user.email}</p><button type="button" onClick={logout} data-testid="button-logout" className="focus-ring mt-4 inline-flex h-10 items-center gap-2 rounded-xl border border-border bg-card px-4 text-xs font-bold transition hover:bg-muted"><LogOut size={14} /> Sign out</button></div> : null}
+        {user ? <div className="rounded-[24px] border border-border bg-card p-5"><p className="font-mono-ui text-[10px] uppercase tracking-[.18em] text-muted-foreground">Account</p><p className="mt-3 text-sm font-bold">{user.username}</p><p className="mt-1 text-xs text-muted-foreground">{user.email}</p><div className="mt-4 flex flex-wrap gap-2"><button type="button" onClick={logout} data-testid="button-logout" className="focus-ring inline-flex h-10 items-center gap-2 rounded-xl border border-border bg-card px-4 text-xs font-bold transition hover:bg-muted"><LogOut size={14} /> Sign out</button><button type="button" onClick={handleDeleteAccount} data-testid="button-delete-account" className={`focus-ring inline-flex h-10 items-center gap-2 rounded-xl border px-4 text-xs font-bold transition ${confirmingDelete ? 'border-destructive bg-destructive/10 text-destructive' : 'border-border bg-card text-muted-foreground hover:bg-muted hover:text-foreground'}`}><Trash2 size={14} /> {confirmingDelete ? 'Tap again to confirm' : 'Delete account'}</button></div>{confirmingDelete ? <p className="mt-2 text-[11px] text-destructive">This removes your account and every meal, workout and photo. It cannot be undone.</p> : null}</div> : null}
         <div className="rounded-[24px] bg-accent/55 p-5"><div className="flex items-center gap-2 text-primary"><CircleAlert size={16} /><span className="font-mono-ui text-[10px] uppercase tracking-[.18em]">A gentle note</span></div><p className="mt-4 font-display text-2xl leading-tight">Numbers are a map, not a grade.</p><p className="mt-3 text-xs leading-relaxed text-muted-foreground">Targets can give your choices a little shape. Listen to your body first.</p></div>
         <div className="rounded-[24px] border border-border bg-card p-5"><p className="font-mono-ui text-[10px] uppercase tracking-[.18em] text-muted-foreground">Your current split</p><div className="mt-5 space-y-3"><TargetSummary label="Calories" value={form.calories} unit="kcal" /><TargetSummary label="Protein" value={form.protein} unit="g" /><TargetSummary label="Carbs" value={form.carbs} unit="g" /><TargetSummary label="Fat" value={form.fat} unit="g" /><TargetSummary label="Water" value={form.waterMl} unit="ml" /></div></div>
         <div className="rounded-[24px] border border-border bg-card p-5"><p className="font-mono-ui text-[10px] uppercase tracking-[.18em] text-muted-foreground">Data backup</p><p className="mt-2 text-xs text-muted-foreground">Export your meals and workouts as a JSON file, or import a previous backup.</p><div className="mt-4 flex gap-2"><button type="button" onClick={handleExport} data-testid="button-export-data" className="focus-ring inline-flex h-10 items-center gap-2 rounded-xl border border-border bg-card px-4 text-xs font-bold transition hover:bg-muted"><Download size={14} /> Export</button><button type="button" onClick={handleImport} data-testid="button-import-data" className="focus-ring inline-flex h-10 items-center gap-2 rounded-xl border border-border bg-card px-4 text-xs font-bold transition hover:bg-muted"><Upload size={14} /> Import</button></div></div>

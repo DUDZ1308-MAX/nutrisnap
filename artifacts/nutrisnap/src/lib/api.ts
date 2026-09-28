@@ -69,6 +69,10 @@ export async function getMe() {
   return apiFetch<AuthResponse>('/api/auth/me');
 }
 
+export async function deleteAccount() {
+  return apiFetch<OkResponse>('/api/auth/me', { method: 'DELETE' });
+}
+
 export async function getMeals() {
   const data = await apiFetch<MealsResponse>('/api/meals');
   return data.meals;
