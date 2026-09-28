@@ -1,6 +1,8 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import {
   todayKey,
+  dateKey,
+  dayKeyOffset,
   defaultGoals,
   exportData,
   parseImport,
@@ -17,14 +19,51 @@ describe("todayKey", () => {
     expect(key).toMatch(/^\d{4}-\d{2}-\d{2}$/);
   });
 
-  it("returns today's date", () => {
-    const key = todayKey();
+  it("matches the local calendar date, not the UTC date", () => {
     const now = new Date();
-    const offset = now.getTimezoneOffset();
-    const expected = new Date(now.getTime() - offset * 60_000)
-      .toISOString()
-      .slice(0, 10);
-    expect(key).toBe(expected);
+    const pad = (n: number) => String(n).padStart(2, "0");
+    const local = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+    expect(todayKey()).toBe(local);
+  });
+});
+
+describe("dateKey", () => {
+  it("uses the local date for late-evening local times", () => {
+    const d = new Date(2026, 0, 1, 23, 30);
+    expect(dateKey(d)).toBe("2026-01-01");
+  });
+
+  it("uses the local date for just-after-midnight local times", () => {
+    const d = new Date(2026, 0, 1, 0, 30);
+    expect(dateKey(d)).toBe("2026-01-01");
+  });
+
+  it("handles month and year boundaries", () => {
+    expect(dateKey(new Date(2026, 0, 1, 12, 0))).toBe("2026-01-01");
+    expect(dateKey(new Date(2026, 11, 31, 12, 0))).toBe("2026-12-31");
+  });
+});
+
+describe("dayKeyOffset", () => {
+  it("defaults to today", () => {
+    expect(dayKeyOffset()).toBe(todayKey());
+    expect(dayKeyOffset(0)).toBe(todayKey());
+  });
+
+  it("returns yesterday for -1", () => {
+    const d = new Date();
+    d.setDate(d.getDate() - 1);
+    const pad = (n: number) => String(n).padStart(2, "0");
+    const expected = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    expect(dayKeyOffset(-1)).toBe(expected);
+  });
+
+  it("returns tomorrow for 1", () => {
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    const pad = (n: number) => String(n).padStart(2, "0");
+    const expected = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    expect(dayKeyOffset(1)).toBe(expected);
   });
 });
 

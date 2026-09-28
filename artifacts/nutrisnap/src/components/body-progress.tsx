@@ -1,6 +1,7 @@
 import { useState, useRef } from "react";
 import { Camera, Trash2, X } from "lucide-react";
 import type { BodyPhoto } from "@/lib/nutrisnap-storage";
+import { todayKey } from "@/lib/nutrisnap-storage";
 
 interface BodyProgressProps {
   photos: BodyPhoto[];
@@ -50,7 +51,7 @@ export function BodyProgress({ photos, userWeight, onAdd, onDelete }: BodyProgre
     if (!preview) return;
     setUploading(true);
     try {
-      const today = new Date().toISOString().slice(0, 10);
+      const today = todayKey();
       await onAdd({
         date: today,
         weight: weight ? Number(weight) : undefined,

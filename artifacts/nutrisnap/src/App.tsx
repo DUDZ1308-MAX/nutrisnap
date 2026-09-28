@@ -33,7 +33,7 @@ import NotFound from '@/pages/not-found';
 import LoginPage from '@/pages/login';
 import RegisterPage from '@/pages/register';
 import { AuthProvider, useAuth } from '@/lib/auth-context';
-import { todayKey, useNutriSnap, workoutTargetAreas, exportData, downloadExport, parseImport, type Goals, type Meal, type Workout } from '@/lib/nutrisnap-storage';
+import { todayKey, dateKey, useNutriSnap, workoutTargetAreas, exportData, downloadExport, parseImport, type Goals, type Meal, type Workout } from '@/lib/nutrisnap-storage';
 import { MuscleMap } from '@/components/muscle-map';
 import { WaterTracker } from '@/components/water-tracker';
 import { WeeklySummary } from '@/components/weekly-summary';
@@ -226,7 +226,7 @@ function HistoryChart({ meals, workouts }: { meals: Meal[]; workouts: Workout[] 
     for (let i = 6; i >= 0; i--) {
       const d = new Date();
       d.setDate(d.getDate() - i);
-      const key = d.toISOString().slice(0, 10);
+      const key = dateKey(d);
       const short = d.toLocaleDateString(undefined, { weekday: 'short' });
       const dayMeals = meals.filter((m) => m.date === key);
       const dayWorkouts = workouts.filter((w) => w.date === key);

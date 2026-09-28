@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { todayKey } from "@/lib/nutrisnap-storage";
 
 interface StreakBadgeProps {
   meals: Array<{ date: string }>;
@@ -14,39 +15,40 @@ interface Achievement {
   unlocked: boolean;
 }
 
-function getStreak(dates: string[]): number {
-  if (dates.length === 0) return 0;
-  const unique = [...new Set(dates.map((d) => d.slice(0, 10)))].sort().reverse();
-  const today = new Date().toISOString().slice(0, 10);
-  if (unique[0] !== today && unique[0] !== getYesterday()) return 0;
-  let streak = 1;
-  for (let i = 0; i < unique.length - 1; i++) {
-    const curr = new Date(unique[i]);
-    const prev = new Date(unique[i + 1]);
-    const diff = (curr.getTime() - prev.getTime()) / (1000 * 60 * 60 * 24);
-    if (diff === 1) streak++;
-    else break;
-  }
-  return streak;
+export type Streak = {
+  count: number;
+  activeToday: boolean;
+  atRisk: boolean;
+};
+
+export function addDays(key: string, days: number): string {
+  const [y, m, d] = key.split("-").map(Number);
+  const date = new Date(Date.UTC(y, m - 1, d));
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
 }
 
-function getYesterday(): string {
-  const d = new Date();
-  d.setDate(d.getDate() - 1);
-  return d.toISOString().slice(0, 10);
+export function getStreak(dates: string[], today: string = todayKey()): Streak {
+  const unique = [...new Set(dates.map((d) => d.slice(0, 10)))].sort().reverse();
+  if (unique.length === 0) return { count: 0, activeToday: false, atRisk: false };
+
+  const activeToday = unique[0] === today;
+  const atRisk = !activeToday && unique[0] === addDays(today, -1);
+  if (!activeToday && !atRisk) return { count: 0, activeToday: false, atRisk: false };
+
+  const daySet = new Set(unique);
+  let count = 0;
+  let cursor = unique[0];
+  while (daySet.has(cursor)) {
+    count++;
+    cursor = addDays(cursor, -1);
+  }
+  return { count, activeToday, atRisk };
 }
 
 export function StreakBadge({ meals, workouts, waterLogs }: StreakBadgeProps) {
   const mealStreak = useMemo(() => getStreak(meals.map((m) => m.date)), [meals]);
   const workoutStreak = useMemo(() => getStreak(workouts.map((w) => w.date)), [workouts]);
-
-  const allDates = useMemo(() => {
-    const set = new Set<string>();
-    meals.forEach((m) => set.add(m.date?.slice(0, 10)));
-    workouts.forEach((w) => set.add(w.date?.slice(0, 10)));
-    waterLogs.forEach((w) => set.add(w.date?.slice(0, 10)));
-    return [...set];
-  }, [meals, workouts, waterLogs]);
 
   const activeDays = useMemo(() => {
     const set = new Set<string>();
@@ -61,8 +63,8 @@ export function StreakBadge({ meals, workouts, waterLogs }: StreakBadgeProps) {
 
   const achievements: Achievement[] = useMemo(
     () => [
-      { id: "streak-7", title: "Week Warrior", description: "7-day logging streak", icon: "🔥", unlocked: mealStreak >= 7 || workoutStreak >= 7 },
-      { id: "streak-30", title: "Monthly Master", description: "30-day logging streak", icon: "🏆", unlocked: mealStreak >= 30 || workoutStreak >= 30 },
+      { id: "streak-7", title: "Week Warrior", description: "7-day logging streak", icon: "🔥", unlocked: mealStreak.count >= 7 || workoutStreak.count >= 7 },
+      { id: "streak-30", title: "Monthly Master", description: "30-day logging streak", icon: "🏆", unlocked: mealStreak.count >= 30 || workoutStreak.count >= 30 },
       { id: "meals-10", title: "Meal Tracker", description: "Log 10 meals", icon: "🍽️", unlocked: totalMeals >= 10 },
       { id: "meals-50", title: "Meal Pro", description: "Log 50 meals", icon: "⭐", unlocked: totalMeals >= 50 },
       { id: "meals-100", title: "Century Club", description: "Log 100 meals", icon: "💯", unlocked: totalMeals >= 100 },
@@ -85,16 +87,40 @@ export function StreakBadge({ meals, workouts, waterLogs }: StreakBadgeProps) {
       </div>
 
       {/* Streak counters */}
-      <div className="grid grid-cols-2 gap-3 mb-4">
-        <div className="bg-orange-50 dark:bg-orange-950/30 rounded-lg p-3 text-center">
-          <div className="text-2xl font-bold text-orange-600 dark:text-orange-400">{mealStreak}</div>
+      <div className="grid grid-cols-2 gap-3 mb-3">
+        <div
+          className={`rounded-lg p-3 text-center transition-colors ${
+            mealStreak.atRisk
+              ? "bg-amber-50 dark:bg-amber-950/40 ring-1 ring-amber-300 dark:ring-amber-800"
+              : "bg-orange-50 dark:bg-orange-950/30"
+          }`}
+          data-testid="streak-meal"
+        >
+          <div className="text-2xl font-bold text-orange-600 dark:text-orange-400">{mealStreak.count}</div>
           <div className="text-xs text-orange-600/70 dark:text-orange-400/70">Day Meal Streak</div>
         </div>
-        <div className="bg-blue-50 dark:bg-blue-950/30 rounded-lg p-3 text-center">
-          <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">{workoutStreak}</div>
+        <div
+          className={`rounded-lg p-3 text-center transition-colors ${
+            workoutStreak.atRisk
+              ? "bg-amber-50 dark:bg-amber-950/40 ring-1 ring-amber-300 dark:ring-amber-800"
+              : "bg-blue-50 dark:bg-blue-950/30"
+          }`}
+          data-testid="streak-workout"
+        >
+          <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">{workoutStreak.count}</div>
           <div className="text-xs text-blue-600/70 dark:text-blue-400/70">Day Workout Streak</div>
         </div>
       </div>
+
+      {(mealStreak.atRisk || workoutStreak.atRisk) && (
+        <p
+          className="mb-3 flex items-center justify-center gap-1.5 text-xs font-semibold text-amber-600 dark:text-amber-400"
+          role="status"
+          data-testid="streak-at-risk"
+        >
+          <span aria-hidden="true">🔥</span> Log today to keep your streak alive
+        </p>
+      )}
 
       {/* Achievements grid */}
       <div className="space-y-2">

@@ -9,6 +9,7 @@ import {
   Legend,
   ResponsiveContainer,
 } from "recharts";
+import { dateKey } from "@/lib/nutrisnap-storage";
 
 type Metric = "calories" | "protein" | "carbs" | "fat" | "weight" | "workouts";
 
@@ -50,7 +51,7 @@ export function TrendChart({ meals, workouts, weightHistory = [] }: TrendChartPr
     for (let i = days - 1; i >= 0; i--) {
       const d = new Date(now);
       d.setDate(d.getDate() - i);
-      const key = d.toISOString().slice(0, 10);
+      const key = dateKey(d);
       dayMap[key] = { date: key, calories: 0, protein: 0, carbs: 0, fat: 0, weight: 0, workouts: 0 };
     }
 
@@ -75,7 +76,7 @@ export function TrendChart({ meals, workouts, weightHistory = [] }: TrendChartPr
 
     // Weight history (fill nearest)
     weightHistory
-      .filter((w) => w.date >= cutoff.toISOString().slice(0, 10))
+      .filter((w) => w.date >= dateKey(cutoff))
       .sort((a, b) => a.date.localeCompare(b.date))
       .forEach((w) => {
         const d = w.date.slice(0, 10);

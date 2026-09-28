@@ -121,10 +121,19 @@ export function parseImport(json: string): NutriSnapExport | null {
 
 // ── React hook ──────────────────────────────────────────────────────────────
 
+export function dateKey(date: Date = new Date()): string {
+  const offset = date.getTimezoneOffset();
+  return new Date(date.getTime() - offset * 60_000).toISOString().slice(0, 10);
+}
+
 export function todayKey() {
-  const now = new Date();
-  const offset = now.getTimezoneOffset();
-  return new Date(now.getTime() - offset * 60_000).toISOString().slice(0, 10);
+  return dateKey();
+}
+
+export function dayKeyOffset(days: number = 0): string {
+  const d = new Date();
+  d.setDate(d.getDate() + days);
+  return dateKey(d);
 }
 
 export function useNutriSnap() {
