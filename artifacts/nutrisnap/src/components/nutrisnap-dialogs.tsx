@@ -1,10 +1,10 @@
-import { Camera, Check, ImagePlus, X, Bookmark, BookmarkCheck, Sparkles, ScanLine } from 'lucide-react';
+import { Camera, Check, ImagePlus, X, Bookmark, BookmarkCheck, Sparkles, ScanLine, Loader2, TriangleAlert } from 'lucide-react';
 import { useEffect, useRef, useState, type ChangeEvent, type FormEvent, type ReactNode } from 'react';
 import type { Meal, MealType, SavedMeal, Workout } from '@/lib/nutrisnap-storage';
 import { todayKey, workoutTargetAreas, type WorkoutTarget } from '@/lib/nutrisnap-storage';
 import { MuscleMap } from '@/components/muscle-map';
 import { useAuth } from '@/lib/auth-context';
-import { lookupBarcode } from '@/lib/api';
+import { lookupBarcode, analyzeMealPhoto, getMe, type MealAnalysis } from '@/lib/api';
 
 type ModalProps = { title: string; eyebrow: string; onClose: () => void; children: ReactNode };
 
@@ -241,6 +241,27 @@ export function MealDialog({ meal, onClose, onSave, savedMeals = [], onSaveFavor
   const [lookupError, setLookupError] = useState('');
   const [lookupSource, setLookupSource] = useState<{ label: string; basis: string | null } | null>(null);
   const [scanning, setScanning] = useState(false);
+  const [analyzing, setAnalyzing] = useState(false);
+  const [analysisError, setAnalysisError] = useState('');
+  const [analysis, setAnalysis] = useState<MealAnalysis | null>(null);
+  // null while the existing consent receipt is still being read from the server.
+  const [consented, setConsented] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    getMe()
+      .then((data) => {
+        if (active) setConsented(Boolean(data.photoAnalysisConsentAt));
+      })
+      .catch(() => {
+        // If the receipt cannot be read, fall back to showing the disclosure again,
+        // which is the safe direction to fail in.
+        if (active) setConsented(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   useEffect(() => {
     setForm({
@@ -257,6 +278,8 @@ export function MealDialog({ meal, onClose, onSave, savedMeals = [], onSaveFavor
     setLookupSource(null);
     setLookupError('');
     setScanning(false);
+    setAnalysis(null);
+    setAnalysisError('');
   }, [meal]);
 
   const set = (key: keyof typeof form, value: string | number | MealType | undefined) => setForm((current) => ({ ...current, [key]: value }));
@@ -279,6 +302,10 @@ export function MealDialog({ meal, onClose, onSave, savedMeals = [], onSaveFavor
         const ctx = canvas.getContext('2d')!;
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
         set('imageDataUrl', canvas.toDataURL('image/jpeg', 0.75));
+        // A new photo invalidates any previous read of it.
+        setAnalysis(null);
+        setAnalysisError('');
+        setLookupSource(null);
       };
       img.src = String(reader.result);
     };
@@ -310,6 +337,36 @@ export function MealDialog({ meal, onClose, onSave, savedMeals = [], onSaveFavor
       setLookupError(error instanceof Error ? error.message : 'Could not look up that barcode.');
     } finally {
       setLooking(false);
+    }
+  };
+
+  const handleAnalyze = async () => {
+    if (!form.imageDataUrl) {
+      setAnalysisError('Add a photo first.');
+      return;
+    }
+    setAnalyzing(true);
+    setAnalysisError('');
+    try {
+      const result = await analyzeMealPhoto(form.imageDataUrl);
+      setAnalysis(result);
+      // Consent is recorded server-side on the first successful call, so the
+      // disclosure stops being shown from here on.
+      setConsented(true);
+      // Prefill only. Everything stays editable and nothing is saved until submit.
+      setForm((current) => ({
+        ...current,
+        name: current.name.trim() || result.dishName,
+        calories: result.totals.calories,
+        protein: Math.round(result.totals.protein),
+        carbs: Math.round(result.totals.carbs),
+        fat: Math.round(result.totals.fat),
+      }));
+      setLookupSource({ label: result.dishName, basis: 'estimated from photo' });
+    } catch (error) {
+      setAnalysisError(error instanceof Error ? error.message : 'Could not analyze that photo.');
+    } finally {
+      setAnalyzing(false);
     }
   };
 
@@ -360,7 +417,7 @@ export function MealDialog({ meal, onClose, onSave, savedMeals = [], onSaveFavor
         <div className="rounded-2xl border border-border bg-background/70 p-3 sm:p-4">
           <div className="mb-2 flex items-center justify-between sm:mb-3">
             <div><p className="text-sm font-bold">Nutrition facts</p><p className="text-[11px] text-muted-foreground sm:text-xs">Auto-fill or enter manually.</p></div>
-            <span className="rounded-full bg-accent/35 px-2 py-0.5 font-mono-ui text-[10px] font-medium text-foreground" data-testid="nutrition-source-badge">{lookupSource ? 'Scanned' : 'Manual'}</span>
+            <span className="rounded-full bg-accent/35 px-2 py-0.5 font-mono-ui text-[10px] font-medium text-foreground" data-testid="nutrition-source-badge">{analysis ? 'Estimated' : lookupSource ? 'Scanned' : 'Manual'}</span>
           </div>
           <div className="mb-2 sm:mb-3">
             <button type="button" onClick={() => setScanning(true)} disabled={looking} className="focus-ring w-full h-9 rounded-xl bg-primary px-4 text-xs font-bold text-primary-foreground transition hover:brightness-105 disabled:opacity-40 disabled:cursor-not-allowed sm:h-10 sm:text-sm" data-testid="button-scan-barcode">
@@ -390,8 +447,77 @@ export function MealDialog({ meal, onClose, onSave, savedMeals = [], onSaveFavor
             <span className="relative mt-1.5 text-[11px] font-bold sm:mt-2 sm:text-xs">{form.imageDataUrl ? 'Replace photo' : 'Add a meal photo'}</span>
             <span className="relative mt-0.5 text-[10px] text-muted-foreground">Optional</span>
           </label>
-          <div className="hidden rounded-2xl border border-border bg-muted/55 p-4 sm:block">
-            <div className="flex items-start gap-2.5"><Camera size={16} className="mt-0.5 shrink-0 text-primary" /><div><p className="text-sm font-bold">Photo analysis unavailable</p><p className="mt-1 text-xs leading-relaxed text-muted-foreground">NutriSnap does not identify food or estimate nutrition from photos. Add the facts manually above.</p></div></div>
+          <div className="rounded-2xl border border-border bg-muted/55 p-3 sm:p-4">
+            {consented === false ? (
+              <>
+                <div className="flex items-start gap-2.5">
+                  <Camera size={16} className="mt-0.5 shrink-0 text-primary" />
+                  <div className="min-w-0">
+                    <p className="text-sm font-bold">Estimate from photo</p>
+                    <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                      Analyzing sends this photo to Google Gemini, which estimates each component and its
+                      portion size. On the free tier, submitted images may be used to improve Google products.
+                    </p>
+                  </div>
+                </div>
+                <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">
+                  Nothing is saved until you press Add, and every number stays editable.
+                </p>
+              </>
+            ) : (
+              <div className="flex items-start gap-2.5">
+                <Camera size={16} className="mt-0.5 shrink-0 text-primary" />
+                <div>
+                  <p className="text-sm font-bold">Estimate from photo</p>
+                  <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                    You have already agreed to photo analysis. Estimates are a starting point, not a measurement.
+                  </p>
+                </div>
+              </div>
+            )}
+            <button
+              type="button"
+              onClick={handleAnalyze}
+              disabled={analyzing || !form.imageDataUrl}
+              className="focus-ring mt-3 inline-flex h-9 w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 text-xs font-bold text-primary-foreground transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-40 sm:h-10 sm:text-sm"
+              data-testid="button-analyze-photo"
+            >
+              {analyzing ? (
+                <><Loader2 size={15} className="animate-spin" /> Analyzing photo...</>
+              ) : consented === false ? (
+                'Agree and estimate nutrition'
+              ) : (
+                'Estimate nutrition from photo'
+              )}
+            </button>
+            {!form.imageDataUrl ? (
+              <p className="mt-2 text-center text-[11px] text-muted-foreground">Add a photo to enable this.</p>
+            ) : null}
+            {analysisError ? (
+              <p className="mt-2 text-xs text-destructive" role="status" data-testid="status-analyze-error">{analysisError}</p>
+            ) : null}
+            {analysis ? (
+              <div className="mt-3 rounded-xl border border-border bg-card p-2.5" data-testid="analysis-breakdown">
+                <div className="mb-1.5 flex items-center justify-between">
+                  <p className="text-[11px] font-bold">What it saw</p>
+                  {analysis.overallConfidence !== 'high' ? (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-bold text-amber-700 dark:text-amber-400">
+                      <TriangleAlert size={10} /> {analysis.overallConfidence} confidence
+                    </span>
+                  ) : null}
+                </div>
+                <ul className="space-y-0.5">
+                  {analysis.items.map((item) => (
+                    <li key={item.name} className="flex items-baseline justify-between gap-2 text-[11px]">
+                      <span className="truncate">{item.name} <span className="text-muted-foreground">~{Math.round(item.grams)}g</span></span>
+                      <span className="shrink-0 font-mono-ui text-muted-foreground">{Math.round(item.calories)} kcal</span>
+                    </li>
+                  ))}
+                </ul>
+                {analysis.notes ? <p className="mt-2 text-[10px] leading-relaxed text-muted-foreground">{analysis.notes}</p> : null}
+                <p className="mt-2 text-[10px] leading-relaxed text-muted-foreground">Portion sizes are estimates. Correct anything that looks off before saving.</p>
+              </div>
+            ) : null}
           </div>
         </div>
         {error ? <p className="text-sm font-semibold text-destructive" role="alert" data-testid="status-meal-form-error">{error}</p> : null}

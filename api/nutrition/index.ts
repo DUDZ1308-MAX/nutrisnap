@@ -1,8 +1,30 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { requireAuth } from "../_lib.js";
+import { requireAuth, getDb, eq } from "../_lib.js";
+import { usersTable } from "../../lib/db/src/schema/index.js";
 import { parseBarcode, normalizeOffProduct, toWholeNumbers } from "./_normalize.js";
+import {
+  ANALYZE_SYSTEM_PROMPT,
+  ANALYZE_RESPONSE_SCHEMA,
+  buildAnalyzePrompt,
+  parseAnalysisText,
+  normalizeAnalysis,
+} from "./_analyze.js";
 
 const OFF_PRODUCT_URL = "https://world.openfoodfacts.org/api/v2/product";
+
+// 2.5 Flash is closed to new users and the larger 3.x Flash models are frequently
+// capacity limited, so the lite tier is the default. Override with GEMINI_MODEL.
+const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-3.5-flash-lite";
+const GEMINI_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
+
+// Vision inference is far slower and costlier than a barcode lookup.
+const ANALYZE_TIMEOUT_MS = 30000;
+const ANALYZE_THROTTLE_WINDOW_MS = 60 * 1000;
+const ANALYZE_MAX_PER_WINDOW = 10;
+
+// The browser already downsizes the photo, so anything larger is not a real meal shot.
+const MAX_IMAGE_BYTES = 1_500_000;
+const ALLOWED_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 
 // Open Food Facts asks consumers to send a identifying User-Agent, and the browser
 // cannot set one, which is why this lookup is proxied server-side.
@@ -38,9 +60,10 @@ const CACHE_MAX_ENTRIES = 200;
 const THROTTLE_WINDOW_MS = 60 * 1000;
 const MAX_REQUESTS_PER_WINDOW = 10;
 
-type CacheEntry = { expiresAt: number; payload: unknown };
+type CacheEntry = { expiresAt: number; status: number; payload: unknown };
 const cache = new Map<string, CacheEntry>();
 const hits = new Map<string, { count: number; windowStart: number }>();
+const analyzeHits = new Map<string, { count: number; windowStart: number }>();
 
 function isThrottled(userId: string): boolean {
   const now = Date.now();
@@ -53,27 +76,166 @@ function isThrottled(userId: string): boolean {
   return record.count > MAX_REQUESTS_PER_WINDOW;
 }
 
-function readCache(code: string): unknown | undefined {
+function isAnalyzeThrottled(userId: string): boolean {
+  const now = Date.now();
+  const record = analyzeHits.get(userId);
+  if (!record || now - record.windowStart >= ANALYZE_THROTTLE_WINDOW_MS) {
+    analyzeHits.set(userId, { count: 1, windowStart: now });
+    return false;
+  }
+  record.count += 1;
+  return record.count > ANALYZE_MAX_PER_WINDOW;
+}
+
+function readCache(code: string): CacheEntry | undefined {
   const entry = cache.get(code);
   if (!entry) return undefined;
   if (Date.now() >= entry.expiresAt) {
     cache.delete(code);
     return undefined;
   }
-  return entry.payload;
+  return entry;
 }
 
-function writeCache(code: string, payload: unknown): void {
+function writeCache(code: string, status: number, payload: unknown): void {
   if (cache.size >= CACHE_MAX_ENTRIES) {
     const oldest = cache.keys().next();
     if (!oldest.done) cache.delete(oldest.value);
   }
-  cache.set(code, { expiresAt: Date.now() + CACHE_TTL_MS, payload });
+  cache.set(code, { expiresAt: Date.now() + CACHE_TTL_MS, status, payload });
+}
+
+/** Splits a data URL into its mime type and base64 payload, rejecting anything unexpected. */
+function readImageDataUrl(value: unknown): { mimeType: string; base64: string } | null {
+  if (typeof value !== "string") return null;
+  const match = /^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=]+)$/.exec(value.trim());
+  if (!match) return null;
+  if (!ALLOWED_IMAGE_TYPES.has(match[1])) return null;
+  // base64 expands by 4/3, so compare against the encoded length rather than decoding.
+  if (Math.ceil((match[2].length * 3) / 4) > MAX_IMAGE_BYTES) return null;
+  return { mimeType: match[1], base64: match[2] };
+}
+
+async function handleAnalyze(req: VercelRequest, res: VercelResponse) {
+  const user = requireAuth(req, res);
+  if (!user) return;
+
+  const body = typeof req.body === "object" && req.body !== null ? (req.body as Record<string, unknown>) : {};
+
+  // Consent is checked before anything else, and a photo is never sent upstream without it.
+  if (body.consent !== true) {
+    return res.status(403).json({
+      error: "Photo analysis needs your consent before a photo can be sent to Google.",
+      code: "consent_required",
+    });
+  }
+
+  const image = readImageDataUrl(body.imageDataUrl);
+  if (!image) {
+    return res.status(400).json({ error: "Add a photo to analyze." });
+  }
+
+  if (isAnalyzeThrottled(user.id)) {
+    return res.status(429).json({ error: "Too many analyses. Give it a minute and try again." });
+  }
+
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    console.error("GEMINI_API_KEY is not configured. Photo analysis is unavailable.");
+    return res.status(503).json({ error: "Photo analysis is not configured on this deployment." });
+  }
+
+  // Record the consent receipt before the upload happens, so the durable record is
+  // never contingent on whether Google happens to be reachable.
+  try {
+    await getDb()
+      .update(usersTable)
+      .set({ photoAnalysisConsentAt: new Date() })
+      .where(eq(usersTable.id, user.id));
+  } catch (error) {
+    // Refusing here is deliberate: consent must be recorded durably before a photo
+    // leaves the server. A failure means the consent column is missing, so the fix is
+    // to run the migration, not to send the photo anyway.
+    console.error("Could not record photo analysis consent:", error);
+    return res.status(500).json({ error: "Consent could not be saved. Try again shortly." });
+  }
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), ANALYZE_TIMEOUT_MS);
+
+  let modelReply: string;
+  try {
+    const response = await fetch(GEMINI_ENDPOINT, {
+      method: "POST",
+      headers: { "x-goog-api-key": apiKey, "Content-Type": "application/json" },
+      signal: controller.signal,
+      body: JSON.stringify({
+        systemInstruction: { parts: [{ text: ANALYZE_SYSTEM_PROMPT }] },
+        contents: [
+          {
+            role: "user",
+            parts: [{ text: buildAnalyzePrompt() }, { inline_data: { mime_type: image.mimeType, data: image.base64 } }],
+          },
+        ],
+        generationConfig: {
+          temperature: 0.2,
+          maxOutputTokens: 2048,
+          responseMimeType: "application/json",
+          responseSchema: ANALYZE_RESPONSE_SCHEMA,
+        },
+      }),
+    });
+
+    if (!response.ok) {
+      const detail = await response.text();
+      console.error(`Gemini responded ${response.status}: ${detail.slice(0, 500)}`);
+
+      if (response.status === 503) {
+        return res.status(503).json({ error: "Photo analysis is busy right now. Try again shortly." });
+      }
+      if (response.status === 429) {
+        return res.status(429).json({ error: "Photo analysis hit its rate limit. Try again shortly." });
+      }
+      if (response.status === 400) {
+        return res.status(502).json({ error: "Photo analysis could not understand that photo. Try a clearer one." });
+      }
+      return res.status(502).json({ error: "Photo analysis failed. Try again shortly." });
+    }
+
+    const payload = await response.json();
+    const parts = payload?.candidates?.[0]?.content?.parts;
+    modelReply = Array.isArray(parts)
+      ? parts.map((part: { text?: unknown }) => (typeof part.text === "string" ? part.text : "")).join("")
+      : "";
+  } catch (error) {
+    console.error("Photo analysis failed:", error);
+    return res.status(502).json({ error: "Photo analysis timed out. Try again." });
+  } finally {
+    clearTimeout(timer);
+  }
+
+  const result = normalizeAnalysis(parseAnalysisText(modelReply));
+
+  // The success branch is checked first because this package compiles without
+  // strictNullChecks, which disables narrowing on a boolean discriminant.
+  if (result.ok) {
+    return res.status(200).json({ source: "gemini", ...result.analysis });
+  }
+
+  const { reason } = result as { reason: "not_food" | "unparseable" };
+  if (reason === "not_food") {
+    return res.status(422).json({ error: "That does not look like food. Try a photo of the meal itself." });
+  }
+  return res.status(502).json({ error: "Photo analysis returned something unreadable. Try again." });
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  if (req.method === "POST") {
+    return handleAnalyze(req, res);
+  }
+
   if (req.method !== "GET") {
-    res.setHeader("Allow", "GET");
+    res.setHeader("Allow", "GET, POST");
     return res.status(405).json({ error: "Method not allowed" });
   }
 
@@ -91,7 +253,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const cached = readCache(code);
   if (cached) {
-    return res.status(200).json(cached);
+    return res.status(cached.status).json(cached.payload);
   }
 
   const controller = new AbortController();
@@ -120,7 +282,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const result = normalizeOffProduct(envelope, code);
 
   if (!result.found) {
-    return res.status(404).json({ error: "No product found for that barcode." });
+    // Cache misses as well as hits: a product that does not exist today is not
+    // going to exist on the next request either.
+    const notFound = { error: "No product found for that barcode." };
+    writeCache(code, 404, notFound);
+    return res.status(404).json(notFound);
   }
 
   const body = {
@@ -129,9 +295,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     totals: toWholeNumbers(result.product.display),
   };
 
-  // Cache misses as well as hits: a product that does not exist today is not
-  // going to exist on the next request either.
-  writeCache(code, body);
+  writeCache(code, 200, body);
 
   return res.status(200).json(body);
 }

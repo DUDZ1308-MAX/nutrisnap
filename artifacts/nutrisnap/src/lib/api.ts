@@ -23,6 +23,8 @@ async function apiFetch<T = Record<string, unknown>>(path: string, options: Requ
 
 interface AuthResponse {
   user: { id: string; email: string; username: string; age: number | null; height: number | null; weight: number | null; units: WeightUnit };
+  /** Set once the user has agreed to send a meal photo to Google. Null until then. */
+  photoAnalysisConsentAt?: string | null;
 }
 
 interface MealsResponse {
@@ -167,6 +169,37 @@ interface BarcodeLookupResponse {
 
 export async function lookupBarcode(code: string) {
   return apiFetch<BarcodeLookupResponse>(`/api/nutrition?code=${encodeURIComponent(code)}`);
+}
+
+// ── Photo analysis (Gemini) ───────────────────────────────────────────────
+
+export type AnalysisConfidence = 'high' | 'medium' | 'low';
+
+export interface AnalyzedItem {
+  name: string;
+  grams: number;
+  confidence: AnalysisConfidence;
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+}
+
+export interface MealAnalysis {
+  source: string;
+  dishName: string;
+  items: AnalyzedItem[];
+  totals: { calories: number; protein: number; carbs: number; fat: number };
+  overallConfidence: AnalysisConfidence;
+  notes: string;
+}
+
+export async function analyzeMealPhoto(imageDataUrl: string) {
+  return apiFetch<MealAnalysis>('/api/nutrition', {
+    method: 'POST',
+    // consent is the durable receipt the server records before the photo is sent upstream.
+    body: JSON.stringify({ imageDataUrl, consent: true }),
+  });
 }
 
 // ── Water ──────────────────────────────────────────────────────────────────
