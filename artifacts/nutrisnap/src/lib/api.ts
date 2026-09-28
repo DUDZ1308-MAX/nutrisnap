@@ -171,6 +171,26 @@ export async function lookupBarcode(code: string) {
   return apiFetch<BarcodeLookupResponse>(`/api/nutrition?code=${encodeURIComponent(code)}`);
 }
 
+// ── Food search (USDA FoodData Central) ──────────────────────────────────────
+
+export interface FoodSearchResult {
+  fdcId: number;
+  description: string;
+  dataType: string;
+  brand: string | null;
+  per100g: BarcodeMacros;
+}
+
+interface FoodSearchResponse {
+  source: string;
+  query: string;
+  foods: FoodSearchResult[];
+}
+
+export async function searchFoods(query: string) {
+  return apiFetch<FoodSearchResponse>(`/api/nutrition?search=${encodeURIComponent(query)}`);
+}
+
 // ── Photo analysis (Gemini) ───────────────────────────────────────────────
 
 export type AnalysisConfidence = 'high' | 'medium' | 'low';

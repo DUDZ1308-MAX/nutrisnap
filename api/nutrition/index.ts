@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { requireAuth } from "../_lib.js";
 import { parseBarcode, normalizeOffProduct, toWholeNumbers } from "./_normalize.js";
+import { normalizeFdcSearch } from "./_fdc.js";
 import {
   ANALYZE_SYSTEM_PROMPT,
   ANALYZE_RESPONSE_SCHEMA,
@@ -58,6 +59,21 @@ const FIELDS = [
 
 const UPSTREAM_TIMEOUT_MS = 8000;
 
+// FoodData Central covers generic foods, which is what someone typing a food
+// name actually wants. Its Branded dataset dominates relevance ranking for
+// queries like "chicken breast" and answers with a specific packaged product
+// nobody was looking for, so those types are excluded server-side.
+const FDC_SEARCH_URL = "https://api.nal.usda.gov/fdc/v1/foods/search";
+// The space is pre-encoded but the parentheses are deliberately left raw:
+// FDC answers 400 when dataType arrives as "Survey%20%28FNDDS%29". This value
+// must be concatenated verbatim and never passed through encodeURIComponent.
+const FDC_DATA_TYPES = "Foundation,Survey%20(FNDDS)";
+const FDC_PAGE_SIZE = 12;
+// Food composition data does not change between releases, so searches are held
+// far longer than barcodes, including empty results.
+const SEARCH_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+const MAX_SEARCH_LENGTH = 80;
+
 // Open Food Facts allows 15 read requests/minute per IP. Stay under it and cache
 // aggressively, because scan-heavy use would otherwise get the deployment banned.
 const CACHE_TTL_MS = 10 * 60 * 1000;
@@ -102,12 +118,12 @@ function readCache(code: string): CacheEntry | undefined {
   return entry;
 }
 
-function writeCache(code: string, status: number, payload: unknown): void {
+function writeCache(code: string, status: number, payload: unknown, ttlMs: number = CACHE_TTL_MS): void {
   if (cache.size >= CACHE_MAX_ENTRIES) {
     const oldest = cache.keys().next();
     if (!oldest.done) cache.delete(oldest.value);
   }
-  cache.set(code, { expiresAt: Date.now() + CACHE_TTL_MS, status, payload });
+  cache.set(code, { expiresAt: Date.now() + ttlMs, status, payload });
 }
 
 /** Splits a data URL into its mime type and base64 payload, rejecting anything unexpected. */
@@ -143,7 +159,7 @@ async function handleAnalyze(req: VercelRequest, res: VercelResponse) {
   if (!image) {
     // The photo was sent but is not something we can use, which is a different
     // problem from having forgotten to attach one.
-    return res.status(400).json({ error: "That photo could not be read. Try a JPEG or PNG under 1 MB." });
+    return res.status(400).json({ error: "That photo could not be read. Try a JPEG, PNG, or WebP under 1.5 MB." });
   }
 
   if (isAnalyzeThrottled(user.id)) {
@@ -248,6 +264,76 @@ async function handleAnalyze(req: VercelRequest, res: VercelResponse) {
   return res.status(502).json({ error: "Photo analysis returned something unreadable. Try again." });
 }
 
+async function handleSearch(req: VercelRequest, res: VercelResponse, rawQuery: string, userId: string) {
+  const query = rawQuery.replace(/\s+/g, " ").trim();
+  if (query.length < 2) {
+    return res.status(400).json({ error: "Type at least two letters to search." });
+  }
+  if (query.length > MAX_SEARCH_LENGTH) {
+    return res.status(400).json({ error: `Keep the search under ${MAX_SEARCH_LENGTH} letters.` });
+  }
+
+  const apiKey = process.env.FDC_API_KEY;
+  if (!apiKey) {
+    console.error("FDC_API_KEY is not configured. Food search is unavailable.");
+    return res.status(503).json({ error: "Food search is not configured on this deployment." });
+  }
+
+  if (isThrottled(userId)) {
+    return res.status(429).json({ error: "Too many lookups. Try again in a minute." });
+  }
+
+  const cacheKey = `s:${query.toLowerCase()}`;
+  const cached = readCache(cacheKey);
+  if (cached) {
+    return res.status(cached.status).json(cached.payload);
+  }
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), UPSTREAM_TIMEOUT_MS);
+
+  let envelope: unknown;
+  try {
+    // query and the key are encoded; FDC_DATA_TYPES is not, on purpose.
+    const url = `${FDC_SEARCH_URL}?query=${encodeURIComponent(query)}&dataType=${FDC_DATA_TYPES}&pageSize=${FDC_PAGE_SIZE}&api_key=${encodeURIComponent(apiKey)}`;
+    const response = await fetch(url, { headers: { Accept: "application/json" }, signal: controller.signal });
+
+    if (!response.ok) {
+      const detail = (await response.text()).slice(0, 300);
+      if (response.status === 401 || response.status === 403) {
+        console.error(`FoodData Central rejected the key (${response.status}): ${detail}`);
+        return res.status(503).json({ error: "Food search is not configured on this deployment." });
+      }
+      if (response.status === 429) {
+        return res.status(429).json({ error: "Food search hit its rate limit. Try again shortly." });
+      }
+      console.error(`FoodData Central responded ${response.status}: ${detail}`);
+      return res.status(502).json({ error: "The food database is not responding. Try again shortly." });
+    }
+
+    envelope = await response.json();
+  } catch (error) {
+    console.error("Food search failed:", error);
+    return res.status(502).json({ error: "Could not reach the food database. Try again shortly." });
+  } finally {
+    clearTimeout(timer);
+  }
+
+  const foods = normalizeFdcSearch(envelope);
+
+  // Empty results are cached too, otherwise every keystroke that matches
+  // nothing spends a FoodData Central request.
+  if (foods.length === 0) {
+    const empty = { source: "usda", query, foods: [] };
+    writeCache(cacheKey, 200, empty, SEARCH_CACHE_TTL_MS);
+    return res.status(200).json(empty);
+  }
+
+  const body = { source: "usda", query, foods };
+  writeCache(cacheKey, 200, body, SEARCH_CACHE_TTL_MS);
+  return res.status(200).json(body);
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method === "POST") {
     return handleAnalyze(req, res);
@@ -261,7 +347,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const user = requireAuth(req, res);
   if (!user) return;
 
-  const code = parseBarcode(typeof req.query.code === "string" ? req.query.code : "");
+  const rawSearch = typeof req.query.search === "string" ? req.query.search : "";
+  const rawCode = typeof req.query.code === "string" ? req.query.code : "";
+
+  if (rawSearch.trim() && rawCode.trim()) {
+    return res.status(400).json({ error: "Search for a food or scan a barcode, not both." });
+  }
+  if (rawSearch.trim()) {
+    return handleSearch(req, res, rawSearch, user.id);
+  }
+
+  const code = parseBarcode(rawCode);
   if (!code) {
     return res.status(400).json({ error: "That does not look like a valid barcode." });
   }

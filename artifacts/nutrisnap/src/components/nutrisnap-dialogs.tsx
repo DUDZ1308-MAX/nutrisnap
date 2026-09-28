@@ -1,10 +1,10 @@
-import { Camera, Check, ImagePlus, X, Bookmark, BookmarkCheck, Sparkles, ScanLine, Loader2, TriangleAlert } from 'lucide-react';
+import { Camera, Check, ImagePlus, X, Bookmark, BookmarkCheck, Sparkles, ScanLine, Search, Loader2, TriangleAlert } from 'lucide-react';
 import { useEffect, useRef, useState, type ChangeEvent, type FormEvent, type ReactNode } from 'react';
 import type { Meal, MealType, SavedMeal, Workout } from '@/lib/nutrisnap-storage';
 import { todayKey, workoutTargetAreas, type WorkoutTarget } from '@/lib/nutrisnap-storage';
 import { MuscleMap } from '@/components/muscle-map';
 import { useAuth } from '@/lib/auth-context';
-import { lookupBarcode, analyzeMealPhoto, getMe, type MealAnalysis } from '@/lib/api';
+import { lookupBarcode, searchFoods, analyzeMealPhoto, getMe, type FoodSearchResult, type MealAnalysis } from '@/lib/api';
 
 type ModalProps = { title: string; eyebrow: string; onClose: () => void; children: ReactNode };
 
@@ -239,13 +239,22 @@ export function MealDialog({ meal, onClose, onSave, savedMeals = [], onSaveFavor
   const [error, setError] = useState('');
   const [looking, setLooking] = useState(false);
   const [lookupError, setLookupError] = useState('');
-  const [lookupSource, setLookupSource] = useState<{ label: string; basis: string | null } | null>(null);
+  const [lookupSource, setLookupSource] = useState<{ label: string; basis: string | null; kind?: 'barcode' | 'search' | 'photo' } | null>(null);
   const [scanning, setScanning] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
   const [analysisError, setAnalysisError] = useState('');
   const [analysis, setAnalysis] = useState<MealAnalysis | null>(null);
   // null while the existing consent receipt is still being read from the server.
   const [consented, setConsented] = useState<boolean | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<FoodSearchResult[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [searchError, setSearchError] = useState('');
+  const [selectedFood, setSelectedFood] = useState<FoodSearchResult | null>(null);
+  const [grams, setGrams] = useState(100);
+  // Selecting a result writes its description into the box, which would otherwise
+  // fire a fresh search for that description and re-open the list underneath it.
+  const [searchPinned, setSearchPinned] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -280,7 +289,50 @@ export function MealDialog({ meal, onClose, onSave, savedMeals = [], onSaveFavor
     setScanning(false);
     setAnalysis(null);
     setAnalysisError('');
+    setSelectedFood(null);
+    setGrams(100);
+    setSearchQuery('');
+    setSearchResults([]);
+    setSearchError('');
+    setSearchPinned(false);
   }, [meal]);
+
+  useEffect(() => {
+    if (searchPinned) {
+      setSearchResults([]);
+      return;
+    }
+    const query = searchQuery.trim();
+    if (query.length < 2) {
+      setSearchResults([]);
+      setSearchError('');
+      return;
+    }
+
+    let active = true;
+    setSearching(true);
+    const timer = setTimeout(() => {
+      searchFoods(query)
+        .then((data) => {
+          if (!active) return;
+          setSearchResults(data.foods);
+          setSearchError('');
+        })
+        .catch((error: unknown) => {
+          if (!active) return;
+          setSearchResults([]);
+          setSearchError(error instanceof Error ? error.message : 'Could not search foods.');
+        })
+        .finally(() => {
+          if (active) setSearching(false);
+        });
+    }, 300);
+
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
+  }, [searchQuery, searchPinned]);
 
   const set = (key: keyof typeof form, value: string | number | MealType | undefined) => setForm((current) => ({ ...current, [key]: value }));
   const handleFile = (event: ChangeEvent<HTMLInputElement>) => {
@@ -316,12 +368,18 @@ export function MealDialog({ meal, onClose, onSave, savedMeals = [], onSaveFavor
     setLooking(true);
     setLookupError('');
     setLookupSource(null);
+    setSelectedFood(null);
+    setGrams(100);
+    setSearchQuery('');
+    setSearchResults([]);
+    setSearchError('');
+    setSearchPinned(false);
     try {
       const data = await lookupBarcode(code);
       const { product, totals } = data;
       if (product.noNutritionData) {
         setForm((current) => ({ ...current, name: current.name.trim() || product.name }));
-        setLookupSource({ label: `${product.name} — no nutrition data on file`, basis: null });
+        setLookupSource({ label: `${product.name} — no nutrition data on file`, basis: null, kind: 'barcode' });
         return;
       }
       setForm((current) => ({
@@ -332,7 +390,7 @@ export function MealDialog({ meal, onClose, onSave, savedMeals = [], onSaveFavor
         carbs: totals.carbs,
         fat: totals.fat,
       }));
-      setLookupSource({ label: product.name, basis: product.basis === 'serving' ? (product.servingLabel ?? '1 serving') : 'per 100 g' });
+      setLookupSource({ label: product.name, basis: product.basis === 'serving' ? (product.servingLabel ?? '1 serving') : 'per 100 g', kind: 'barcode' });
     } catch (error) {
       setLookupError(error instanceof Error ? error.message : 'Could not look up that barcode.');
     } finally {
@@ -347,6 +405,12 @@ export function MealDialog({ meal, onClose, onSave, savedMeals = [], onSaveFavor
     }
     setAnalyzing(true);
     setAnalysisError('');
+    setSelectedFood(null);
+    setGrams(100);
+    setSearchQuery('');
+    setSearchResults([]);
+    setSearchError('');
+    setSearchPinned(false);
     try {
       const result = await analyzeMealPhoto(form.imageDataUrl);
       setAnalysis(result);
@@ -362,12 +426,50 @@ export function MealDialog({ meal, onClose, onSave, savedMeals = [], onSaveFavor
         carbs: Math.round(result.totals.carbs),
         fat: Math.round(result.totals.fat),
       }));
-      setLookupSource({ label: result.dishName, basis: 'estimated from photo' });
+      setLookupSource({ label: result.dishName, basis: 'estimated from photo', kind: 'photo' });
     } catch (error) {
       setAnalysisError(error instanceof Error ? error.message : 'Could not analyze that photo.');
     } finally {
       setAnalyzing(false);
     }
+  };
+
+  const selectFood = (food: FoodSearchResult) => {
+    setSelectedFood(food);
+    setGrams(100);
+    setSearchQuery(food.description);
+    setSearchPinned(true);
+    setSearchResults([]);
+    setAnalysis(null);
+    setAnalysisError('');
+    const per100 = food.per100g;
+    // Prefill only, the same contract as the barcode and photo paths.
+    setForm((current) => ({
+      ...current,
+      name: current.name.trim() || food.description,
+      calories: Math.round(per100.calories ?? 0),
+      protein: Math.round(per100.protein ?? 0),
+      carbs: Math.round(per100.carbs ?? 0),
+      fat: Math.round(per100.fat ?? 0),
+    }));
+    setLookupSource({ label: food.description, basis: 'USDA · per 100 g', kind: 'search' });
+  };
+
+  const applyGrams = (raw: string) => {
+    if (!selectedFood) return;
+    const value = Number(raw);
+    if (!Number.isFinite(value) || value <= 0) return;
+    const portion = Math.min(value, 3000);
+    setGrams(portion);
+    const factor = portion / 100;
+    const per100 = selectedFood.per100g;
+    setForm((current) => ({
+      ...current,
+      calories: Math.round((per100.calories ?? 0) * factor),
+      protein: Math.round((per100.protein ?? 0) * factor),
+      carbs: Math.round((per100.carbs ?? 0) * factor),
+      fat: Math.round((per100.fat ?? 0) * factor),
+    }));
   };
 
   const submit = (event: FormEvent) => {
@@ -417,12 +519,51 @@ export function MealDialog({ meal, onClose, onSave, savedMeals = [], onSaveFavor
         <div className="rounded-2xl border border-border bg-background/70 p-3 sm:p-4">
           <div className="mb-2 flex items-center justify-between sm:mb-3">
             <div><p className="text-sm font-bold">Nutrition facts</p><p className="text-[11px] text-muted-foreground sm:text-xs">Auto-fill or enter manually.</p></div>
-            <span className="rounded-full bg-accent/35 px-2 py-0.5 font-mono-ui text-[10px] font-medium text-foreground" data-testid="nutrition-source-badge">{analysis ? 'Estimated' : lookupSource ? 'Scanned' : 'Manual'}</span>
+            <span className="rounded-full bg-accent/35 px-2 py-0.5 font-mono-ui text-[10px] font-medium text-foreground" data-testid="nutrition-source-badge">{analysis ? 'Estimated' : lookupSource?.kind === 'search' ? 'Matched' : lookupSource ? 'Scanned' : 'Manual'}</span>
           </div>
-          <div className="mb-2 sm:mb-3">
+          <div className="mb-2 space-y-2 sm:mb-3">
             <button type="button" onClick={() => setScanning(true)} disabled={looking} className="focus-ring w-full h-9 rounded-xl bg-primary px-4 text-xs font-bold text-primary-foreground transition hover:brightness-105 disabled:opacity-40 disabled:cursor-not-allowed sm:h-10 sm:text-sm" data-testid="button-scan-barcode">
               <span className="inline-flex items-center gap-2"><ScanLine size={15} /> {looking ? 'Looking up...' : 'Scan barcode to fill'}</span>
             </button>
+            <div className="relative">
+              <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+              <input
+                type="search"
+                value={searchQuery}
+                onChange={(event) => {
+                  setSearchQuery(event.target.value);
+                  setSearchPinned(false);
+                }}
+                placeholder="Or search a food name"
+                className={`${inputClass} pl-8`}
+                data-testid="input-food-search"
+              />
+            </div>
+            {searching ? <p className="text-[11px] text-muted-foreground" data-testid="status-food-searching">Searching...</p> : null}
+            {searchError ? <p className="text-xs text-destructive" role="status" data-testid="status-food-search-error">{searchError}</p> : null}
+            {!searching && !searchError && searchQuery.trim().length >= 2 && searchResults.length === 0 && !searchPinned ? (
+              <p className="text-[11px] text-muted-foreground" data-testid="status-food-search-empty">No foods matched.</p>
+            ) : null}
+            {searchResults.length > 0 ? (
+              <ul className="max-h-56 space-y-1 overflow-y-auto rounded-xl border border-border bg-card p-1" data-testid="list-food-search-results">
+                {searchResults.map((food) => (
+                  <li key={food.fdcId}>
+                    <button
+                      type="button"
+                      onClick={() => selectFood(food)}
+                      data-testid={`button-food-result-${food.fdcId}`}
+                      className="focus-ring flex w-full items-baseline justify-between gap-2 rounded-lg px-2 py-1.5 text-left transition hover:bg-accent"
+                    >
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-xs font-semibold">{food.description}</span>
+                        <span className="block truncate text-[10px] text-muted-foreground">{food.dataType}{food.brand ? ` · ${food.brand}` : ''}</span>
+                      </span>
+                      <span className="shrink-0 font-mono-ui text-[11px] text-muted-foreground">{Math.round(food.per100g.calories ?? 0)} kcal</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
           </div>
           {lookupError ? <p className="mb-2 text-xs text-destructive" role="status" data-testid="status-barcode-error">{lookupError}</p> : null}
           {lookupSource ? (
@@ -430,6 +571,16 @@ export function MealDialog({ meal, onClose, onSave, savedMeals = [], onSaveFavor
               Filled from <span className="font-semibold text-foreground">{lookupSource.label}</span>
               {lookupSource.basis ? <span> · {lookupSource.basis}</span> : null} · check before saving
             </p>
+          ) : null}
+          {selectedFood ? (
+            <div className="mb-2 flex items-end gap-2 sm:mb-3" data-testid="food-portion-row">
+              <Field label="Portion · g">
+                <input type="number" min="1" max="3000" value={grams} onChange={(event) => applyGrams(event.target.value)} className={inputClass} data-testid="input-meal-grams" />
+              </Field>
+              <p className="flex-1 pb-2 text-[11px] leading-relaxed text-muted-foreground">
+                Scaled from {Math.round(selectedFood.per100g.calories ?? 0)} kcal per 100 g. Check before saving.
+              </p>
+            </div>
           ) : null}
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3">
             <Field label="Calories"><input type="number" min="0" max="99999" value={form.calories} onChange={(event) => set('calories', Number(event.target.value))} className={inputClass} data-testid="input-meal-calories" /></Field>
