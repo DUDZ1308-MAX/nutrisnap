@@ -40,6 +40,8 @@ import { WeeklySummary } from '@/components/weekly-summary';
 import { TrendChart } from '@/components/trend-chart';
 import { StreakBadge } from '@/components/streak-badge';
 import { BodyProgress } from '@/components/body-progress';
+import { RestTimer } from '@/components/rest-timer';
+import { MacroPieChart } from '@/components/macro-pie-chart';
 
 const queryClient = new QueryClient();
 
@@ -181,6 +183,11 @@ function Overview({ data, onAddMeal, onAddWorkout, onEditMeal, onEditWorkout, on
       <HealthRating totals={totals} goals={data.goals} todayMeals={todayMeals} todayWorkouts={todayWorkouts} />
 
       <HealthStats user={user} goals={data.goals} />
+
+      <div className="mt-5 grid gap-5 sm:grid-cols-2">
+        <MacroPieChart protein={totals.protein} carbs={totals.carbs} fat={totals.fat} />
+        <RestTimer />
+      </div>
 
       <TrendChart meals={data.meals} workouts={data.workouts} />
 

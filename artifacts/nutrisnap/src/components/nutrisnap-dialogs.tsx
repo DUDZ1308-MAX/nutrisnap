@@ -172,12 +172,25 @@ export function MealDialog({ meal, onClose, onSave, savedMeals = [], onSaveFavor
   const handleFile = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
-    if (file.size > 2_500_000) {
-      setError('Choose an image smaller than 2.5 MB.');
+    if (file.size > 5_000_000) {
+      setError('Choose an image smaller than 5 MB.');
       return;
     }
     const reader = new FileReader();
-    reader.onload = () => set('imageDataUrl', String(reader.result));
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const maxW = 600;
+        const ratio = Math.min(maxW / img.width, 1);
+        canvas.width = img.width * ratio;
+        canvas.height = img.height * ratio;
+        const ctx = canvas.getContext('2d')!;
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        set('imageDataUrl', canvas.toDataURL('image/jpeg', 0.75));
+      };
+      img.src = String(reader.result);
+    };
     reader.readAsDataURL(file);
   };
   const handleNutritionLookup = async () => {
@@ -273,7 +286,7 @@ export function MealDialog({ meal, onClose, onSave, savedMeals = [], onSaveFavor
 
         <div className="grid gap-3 sm:grid-cols-[1fr_1.2fr] sm:gap-4">
           <label className="group relative flex min-h-[100px] cursor-pointer flex-col items-center justify-center overflow-hidden rounded-2xl border border-dashed border-primary/35 bg-secondary/45 p-3 text-center transition hover:border-primary hover:bg-secondary sm:min-h-[128px] sm:p-4">
-            <input type="file" accept="image/*" onChange={handleFile} className="sr-only" data-testid="input-meal-photo" />
+            <input type="file" accept="image/*" capture="environment" onChange={handleFile} className="sr-only" data-testid="input-meal-photo" />
             {form.imageDataUrl ? <img src={form.imageDataUrl} alt="Meal preview" className="absolute inset-0 h-full w-full object-cover opacity-70" data-testid="img-meal-preview" /> : null}
             <span className="relative grid size-8 place-items-center rounded-full bg-card text-primary shadow-sm sm:size-9"><ImagePlus size={16} /></span>
             <span className="relative mt-1.5 text-[11px] font-bold sm:mt-2 sm:text-xs">{form.imageDataUrl ? 'Replace photo' : 'Add a meal photo'}</span>
