@@ -103,6 +103,32 @@ export function buildAnalyzePrompt(): string {
   ].join("\n");
 }
 
+export const GENERATE_SYSTEM_PROMPT = [
+  "You estimate the nutrition of a meal from a written description, for a food tracking app.",
+  "",
+  "Identify each component the description implies. A composed meal is several items, not one.",
+  "For every component, report the portion weight in grams and that food's macros per 100 g,",
+  "using standard reference values. Infer portion sizes from the description (counts, sizes,",
+  "cooking methods) and state the assumption in `notes` when the scale is ambiguous.",
+  "",
+  "Never report meal totals and never report a single calorie figure for the whole meal. The",
+  "application computes totals from your components, so per-100g values must be self-consistent.",
+  "",
+  "Be conservative with confidence. Portion weight is an estimate, not a measurement, and the",
+  "user reviews and corrects everything before it is saved.",
+].join("\n");
+
+export function buildGeneratePrompt(mealName: string, hasPhoto: boolean): string {
+  return [
+    `Estimate the nutrition of this meal: ${mealName}`,
+    hasPhoto
+      ? "A photo is attached for reference. Use it to refine portion sizes and identify components."
+      : "Estimate from the description alone, using standard portion sizes.",
+    "Break it into components with per-100g macros and an estimated gram weight for each.",
+    "Reply with JSON matching the provided schema and nothing else.",
+  ].join("\n");
+}
+
 /**
  * Gemini is asked for JSON via responseSchema, but a model can still wrap output in
  * a fenced block or add prose, so strip the common wrappers before parsing.

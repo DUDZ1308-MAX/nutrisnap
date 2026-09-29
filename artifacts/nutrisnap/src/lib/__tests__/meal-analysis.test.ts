@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parseAnalysisText, normalizeAnalysis } from "../../../../../api/nutrition/_analyze";
+import { parseAnalysisText, normalizeAnalysis, buildGeneratePrompt, GENERATE_SYSTEM_PROMPT } from "../../../../../api/nutrition/_analyze";
 
 // A two-component plate the model would plausibly return.
 const chickenRice = {
@@ -171,5 +171,37 @@ describe("normalizeAnalysis", () => {
   it("rejects non-object input", () => {
     expect(normalizeAnalysis(null)).toEqual({ ok: false, reason: "unparseable" });
     expect(normalizeAnalysis("nope")).toEqual({ ok: false, reason: "unparseable" });
+  });
+});
+
+describe("buildGeneratePrompt", () => {
+  it("includes the meal name", () => {
+    const prompt = buildGeneratePrompt("2 eggs, toast, and coffee", false);
+    expect(prompt).toContain("2 eggs, toast, and coffee");
+  });
+
+  it("mentions the photo when one is attached", () => {
+    const prompt = buildGeneratePrompt("oatmeal with banana", true);
+    expect(prompt).toContain("photo");
+  });
+
+  it("does not mention a photo when none is attached", () => {
+    const prompt = buildGeneratePrompt("oatmeal with banana", false);
+    expect(prompt).not.toContain("photo");
+  });
+
+  it("asks for JSON matching the schema", () => {
+    expect(buildGeneratePrompt("salad", false)).toContain("JSON");
+  });
+});
+
+describe("GENERATE_SYSTEM_PROMPT", () => {
+  it("asks for components with per-100g macros and portion weights", () => {
+    expect(GENERATE_SYSTEM_PROMPT).toContain("per 100 g");
+    expect(GENERATE_SYSTEM_PROMPT).toContain("portion weight");
+  });
+
+  it("forbids meal totals so the app computes them", () => {
+    expect(GENERATE_SYSTEM_PROMPT).toContain("Never report meal totals");
   });
 });

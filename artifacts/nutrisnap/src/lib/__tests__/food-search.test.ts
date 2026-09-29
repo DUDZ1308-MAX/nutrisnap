@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { normalizeFdcFood, normalizeFdcSearch, parseGrams, rankFdcFoods, scalePer100g } from "../../../../../api/nutrition/_fdc";
+import { toNumber } from "../../../../../api/nutrition/_normalize";
 
 // A Survey (FNDDS) food as FDC returns it. Nutrient names are deliberately the
 // real ones ("Total lipid (fat)", "Carbohydrate, by difference") because the
@@ -191,5 +192,24 @@ describe("scalePer100g", () => {
     const scaled = scalePer100g({ calories: 202, protein: null, carbs: 7.34, fat: 9.15 }, 200);
     expect(scaled.protein).toBeNull();
     expect(scaled.calories).toBeCloseTo(404);
+  });
+});
+
+describe("toNumber", () => {
+  it("coerces numeric strings, as parts of every dataset return them", () => {
+    expect(toNumber("42.5")).toBe(42.5);
+    expect(toNumber("  7  ")).toBe(7);
+  });
+
+  it("passes numbers through unchanged", () => {
+    expect(toNumber(42)).toBe(42);
+  });
+
+  it("rejects null, booleans, non-numeric and negative values", () => {
+    expect(toNumber(null)).toBeNull();
+    expect(toNumber(undefined)).toBeNull();
+    expect(toNumber(true)).toBeNull();
+    expect(toNumber("abc")).toBeNull();
+    expect(toNumber(-5)).toBeNull();
   });
 });

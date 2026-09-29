@@ -141,38 +141,13 @@ export async function resetPassword(token: string, password: string) {
   });
 }
 
-// ── Barcode lookup (Open Food Facts) ────────────────────────────────────────
+// ── Shared macro type ────────────────────────────────────────────────────────
 
 export interface BarcodeMacros {
   calories: number | null;
   protein: number | null;
   carbs: number | null;
   fat: number | null;
-}
-
-export interface BarcodeProduct {
-  code: string;
-  name: string;
-  brands: string;
-  imageUrl: string | null;
-  quantity: string | null;
-  basis: 'serving' | '100g';
-  servingLabel: string | null;
-  servingGrams: number | null;
-  per100g: BarcodeMacros;
-  perServing: BarcodeMacros | null;
-  display: BarcodeMacros;
-  noNutritionData: boolean;
-}
-
-interface BarcodeLookupResponse {
-  source: string;
-  product: BarcodeProduct;
-  totals: { calories: number; protein: number; carbs: number; fat: number };
-}
-
-export async function lookupBarcode(code: string) {
-  return apiFetch<BarcodeLookupResponse>(`/api/nutrition?code=${encodeURIComponent(code)}`);
 }
 
 // ── Food search (USDA FoodData Central) ──────────────────────────────────────
@@ -223,6 +198,13 @@ export async function analyzeMealPhoto(imageDataUrl: string) {
     method: 'POST',
     // consent is the durable receipt the server records before the photo is sent upstream.
     body: JSON.stringify({ imageDataUrl, consent: true }),
+  });
+}
+
+export async function generateNutrition(mealName: string, imageDataUrl?: string) {
+  return apiFetch<MealAnalysis>('/api/nutrition', {
+    method: 'POST',
+    body: JSON.stringify({ mealName, consent: true, ...(imageDataUrl ? { imageDataUrl } : {}) }),
   });
 }
 

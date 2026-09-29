@@ -1,23 +1,22 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { requireAuth } from "../_lib.js";
-import { parseBarcode, normalizeOffProduct, toWholeNumbers } from "./_normalize.js";
 import { normalizeFdcSearch, rankFdcFoods } from "./_fdc.js";
 import {
   ANALYZE_SYSTEM_PROMPT,
+  GENERATE_SYSTEM_PROMPT,
   ANALYZE_RESPONSE_SCHEMA,
   buildAnalyzePrompt,
+  buildGeneratePrompt,
   parseAnalysisText,
   normalizeAnalysis,
 } from "./_analyze.js";
-
-const OFF_PRODUCT_URL = "https://world.openfoodfacts.org/api/v2/product";
 
 // 2.5 Flash is closed to new users and the larger 3.x Flash models are frequently
 // capacity limited, so the lite tier is the default. Override with GEMINI_MODEL.
 const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-3.5-flash-lite";
 const GEMINI_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
 
-// Vision inference is far slower and costlier than a barcode lookup. Measured calls
+// Vision and text inference are both far slower than a food search. Measured calls
 // against Gemini have run from 9s to 42s, so the function must be allowed to stay up
 // well past Vercel's default 10s limit or the platform kills it mid-request.
 export const config = { maxDuration: 60 };
@@ -32,31 +31,6 @@ const ANALYZE_ATTEMPTS = 2;
 const MAX_IMAGE_BYTES = 1_500_000;
 const ALLOWED_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 
-// Open Food Facts asks consumers to send a identifying User-Agent, and the browser
-// cannot set one, which is why this lookup is proxied server-side.
-const OFF_USER_AGENT = "NutriSnap/1.0 (https://nutrisnap-iota-orcin.vercel.app)";
-
-const FIELDS = [
-  "code",
-  "product_name",
-  "brands",
-  "quantity",
-  "serving_size",
-  "serving_quantity",
-  "nutrition_data",
-  "image_front_small_url",
-  "energy-kcal_100g",
-  "energy-kcal_serving",
-  "energy-kj_100g",
-  "energy-kj_serving",
-  "proteins_100g",
-  "proteins_serving",
-  "carbohydrates_100g",
-  "carbohydrates_serving",
-  "fat_100g",
-  "fat_serving",
-].join(",");
-
 const UPSTREAM_TIMEOUT_MS = 8000;
 
 // FoodData Central covers generic foods, which is what someone typing a food
@@ -70,8 +44,6 @@ const FDC_PAGE_SIZE = 12;
 const SEARCH_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 const MAX_SEARCH_LENGTH = 80;
 
-// Open Food Facts allows 15 read requests/minute per IP. Stay under it and cache
-// aggressively, because scan-heavy use would otherwise get the deployment banned.
 const CACHE_TTL_MS = 10 * 60 * 1000;
 const CACHE_MAX_ENTRIES = 200;
 const THROTTLE_WINDOW_MS = 60 * 1000;
@@ -104,22 +76,22 @@ function isAnalyzeThrottled(userId: string): boolean {
   return record.count > ANALYZE_MAX_PER_WINDOW;
 }
 
-function readCache(code: string): CacheEntry | undefined {
-  const entry = cache.get(code);
+function readCache(key: string): CacheEntry | undefined {
+  const entry = cache.get(key);
   if (!entry) return undefined;
   if (Date.now() >= entry.expiresAt) {
-    cache.delete(code);
+    cache.delete(key);
     return undefined;
   }
   return entry;
 }
 
-function writeCache(code: string, status: number, payload: unknown, ttlMs: number = CACHE_TTL_MS): void {
+function writeCache(key: string, status: number, payload: unknown, ttlMs: number = CACHE_TTL_MS): void {
   if (cache.size >= CACHE_MAX_ENTRIES) {
     const oldest = cache.keys().next();
     if (!oldest.done) cache.delete(oldest.value);
   }
-  cache.set(code, { expiresAt: Date.now() + ttlMs, status, payload });
+  cache.set(key, { expiresAt: Date.now() + ttlMs, status, payload });
 }
 
 /** Splits a data URL into its mime type and base64 payload, rejecting anything unexpected. */
@@ -133,11 +105,121 @@ function readImageDataUrl(value: unknown): { mimeType: string; base64: string } 
   return { mimeType: match[1], base64: match[2] };
 }
 
+type GeminiPart = { text: string } | { inline_data: { mime_type: string; data: string } };
+type GeminiOutcome = { ok: true; text: string } | { ok: false; status: number };
+
+function isGeminiFailure(outcome: GeminiOutcome): outcome is { ok: false; status: number } {
+  return outcome.ok === false;
+}
+
+/**
+ * Shared Gemini call for both photo analysis and text generation. Handles the
+ * timeout, the single retry on capacity errors, and extraction of the model's
+ * text from the response envelope.
+ */
+async function callGemini(systemPrompt: string, parts: GeminiPart[]): Promise<GeminiOutcome> {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    console.error("GEMINI_API_KEY is not configured.");
+    return { ok: false, status: 503 };
+  }
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), ANALYZE_TIMEOUT_MS);
+
+  let modelReply = "";
+  let lastStatus = 0;
+
+  try {
+    for (let attempt = 1; attempt <= ANALYZE_ATTEMPTS; attempt += 1) {
+      const response = await fetch(GEMINI_ENDPOINT, {
+        method: "POST",
+        headers: { "x-goog-api-key": apiKey, "Content-Type": "application/json" },
+        signal: controller.signal,
+        body: JSON.stringify({
+          systemInstruction: { parts: [{ text: systemPrompt }] },
+          contents: [{ role: "user", parts }],
+          generationConfig: {
+            temperature: 0.2,
+            // Six components is a few hundred tokens; a small ceiling measurably
+            // cuts latency, which is the slowest part of this request.
+            maxOutputTokens: 1024,
+            responseMimeType: "application/json",
+            responseSchema: ANALYZE_RESPONSE_SCHEMA,
+          },
+        }),
+      });
+
+      if (response.ok) {
+        const payload = await response.json();
+        const contentParts = payload?.candidates?.[0]?.content?.parts;
+        modelReply = Array.isArray(contentParts)
+          ? contentParts.map((part: { text?: unknown }) => (typeof part.text === "string" ? part.text : "")).join("")
+          : "";
+        break;
+      }
+
+      lastStatus = response.status;
+      const retryable = response.status === 503 || response.status === 429;
+      if (!retryable || attempt === ANALYZE_ATTEMPTS) {
+        console.error(`Gemini responded ${response.status}: ${(await response.text()).slice(0, 500)}`);
+        break;
+      }
+
+      console.warn(`Gemini ${response.status} on attempt ${attempt}/${ANALYZE_ATTEMPTS}, retrying`);
+      await new Promise((resolve) => setTimeout(resolve, 800 * attempt));
+    }
+  } catch (error) {
+    console.error("Gemini call failed:", error);
+    return { ok: false, status: 502 };
+  } finally {
+    clearTimeout(timer);
+  }
+
+  if (!modelReply) {
+    return { ok: false, status: lastStatus || 502 };
+  }
+  return { ok: true, text: modelReply };
+}
+
+function mapGeminiError(res: VercelResponse, status: number) {
+  if (status === 503) {
+    return res.status(503).json({ error: "Analysis is busy right now. Try again shortly." });
+  }
+  if (status === 429) {
+    return res.status(429).json({ error: "Analysis hit its rate limit. Try again shortly." });
+  }
+  if (status === 400) {
+    return res.status(502).json({ error: "Analysis could not understand that input. Try again." });
+  }
+  return res.status(502).json({ error: "Analysis failed. Try again shortly." });
+}
+
+function sendAnalysis(res: VercelResponse, modelReply: string) {
+  const result = normalizeAnalysis(parseAnalysisText(modelReply));
+
+  // The success branch is checked first because this package compiles without
+  // strictNullChecks, which disables narrowing on a boolean discriminant.
+  if (result.ok) {
+    return res.status(200).json({ source: "gemini", ...result.analysis });
+  }
+
+  const { reason } = result as { reason: "not_food" | "unparseable" };
+  if (reason === "not_food") {
+    return res.status(422).json({ error: "That does not look like food. Try a different description." });
+  }
+  return res.status(502).json({ error: "Analysis returned something unreadable. Try again." });
+}
+
+function readBody(req: VercelRequest): Record<string, unknown> {
+  return typeof req.body === "object" && req.body !== null ? (req.body as Record<string, unknown>) : {};
+}
+
 async function handleAnalyze(req: VercelRequest, res: VercelResponse) {
   const user = requireAuth(req, res);
   if (!user) return;
 
-  const body = typeof req.body === "object" && req.body !== null ? (req.body as Record<string, unknown>) : {};
+  const body = readBody(req);
 
   // Consent is checked before anything else, and a photo is never sent upstream without it.
   if (body.consent !== true) {
@@ -162,105 +244,61 @@ async function handleAnalyze(req: VercelRequest, res: VercelResponse) {
     return res.status(429).json({ error: "Too many analyses. Give it a minute and try again." });
   }
 
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    console.error("GEMINI_API_KEY is not configured. Photo analysis is unavailable.");
-    return res.status(503).json({ error: "Photo analysis is not configured on this deployment." });
+  const outcome = await callGemini(ANALYZE_SYSTEM_PROMPT, [
+    { text: buildAnalyzePrompt() },
+    { inline_data: { mime_type: image.mimeType, data: image.base64 } },
+  ]);
+  if (isGeminiFailure(outcome)) {
+    return mapGeminiError(res, outcome.status);
   }
-
-  // The client must have shown the disclosure and had it accepted. A durable
-  // per-user receipt lives in its own table, which is created by a migration and
-  // deliberately kept off the users table so a missing table can never take
-  // login and registration down with it.
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), ANALYZE_TIMEOUT_MS);
-
-  let modelReply = "";
-  let lastStatus = 0;
-  let lastDetail = "";
-
-  try {
-    for (let attempt = 1; attempt <= ANALYZE_ATTEMPTS; attempt += 1) {
-      const response = await fetch(GEMINI_ENDPOINT, {
-        method: "POST",
-        headers: { "x-goog-api-key": apiKey, "Content-Type": "application/json" },
-        signal: controller.signal,
-        body: JSON.stringify({
-          systemInstruction: { parts: [{ text: ANALYZE_SYSTEM_PROMPT }] },
-          contents: [
-            {
-              role: "user",
-              parts: [{ text: buildAnalyzePrompt() }, { inline_data: { mime_type: image.mimeType, data: image.base64 } }],
-            },
-          ],
-          generationConfig: {
-            temperature: 0.2,
-            // Six components is a few hundred tokens; a small ceiling measurably
-            // cuts latency, which is the slowest part of this request.
-            maxOutputTokens: 1024,
-            responseMimeType: "application/json",
-            responseSchema: ANALYZE_RESPONSE_SCHEMA,
-          },
-        }),
-      });
-
-      if (response.ok) {
-        const payload = await response.json();
-        const parts = payload?.candidates?.[0]?.content?.parts;
-        modelReply = Array.isArray(parts)
-          ? parts.map((part: { text?: unknown }) => (typeof part.text === "string" ? part.text : "")).join("")
-          : "";
-        break;
-      }
-
-      lastStatus = response.status;
-      lastDetail = (await response.text()).slice(0, 500);
-
-      const retryable = response.status === 503 || response.status === 429;
-      if (!retryable || attempt === ANALYZE_ATTEMPTS) {
-        console.error(`Gemini responded ${response.status}: ${lastDetail}`);
-        break;
-      }
-
-      console.warn(`Gemini ${response.status} on attempt ${attempt}/${ANALYZE_ATTEMPTS}, retrying`);
-      await new Promise((resolve) => setTimeout(resolve, 800 * attempt));
-    }
-  } catch (error) {
-    console.error("Photo analysis failed:", error);
-    return res.status(502).json({ error: "Photo analysis timed out. Try again." });
-  } finally {
-    clearTimeout(timer);
-  }
-
-  if (!modelReply) {
-    if (lastStatus === 503) {
-      return res.status(503).json({ error: "Photo analysis is busy right now. Try again shortly." });
-    }
-    if (lastStatus === 429) {
-      return res.status(429).json({ error: "Photo analysis hit its rate limit. Try again shortly." });
-    }
-    if (lastStatus === 400) {
-      return res.status(502).json({ error: "Photo analysis could not understand that photo. Try a clearer one." });
-    }
-    return res.status(502).json({ error: "Photo analysis failed. Try again shortly." });
-  }
-
-  const result = normalizeAnalysis(parseAnalysisText(modelReply));
-
-  // The success branch is checked first because this package compiles without
-  // strictNullChecks, which disables narrowing on a boolean discriminant.
-  if (result.ok) {
-    return res.status(200).json({ source: "gemini", ...result.analysis });
-  }
-
-  const { reason } = result as { reason: "not_food" | "unparseable" };
-  if (reason === "not_food") {
-    return res.status(422).json({ error: "That does not look like food. Try a photo of the meal itself." });
-  }
-  return res.status(502).json({ error: "Photo analysis returned something unreadable. Try again." });
+  return sendAnalysis(res, outcome.text);
 }
 
-async function handleSearch(req: VercelRequest, res: VercelResponse, rawQuery: string, userId: string) {
+async function handleGenerate(req: VercelRequest, res: VercelResponse) {
+  const user = requireAuth(req, res);
+  if (!user) return;
+
+  const body = readBody(req);
+
+  if (body.consent !== true) {
+    return res.status(403).json({
+      error: "Generating nutrition facts needs your consent before your meal can be sent to Google.",
+      code: "consent_required",
+    });
+  }
+
+  const mealName = typeof body.mealName === "string" ? body.mealName.trim() : "";
+  if (mealName.length < 2) {
+    return res.status(400).json({ error: "Give this meal a name first." });
+  }
+
+  // A photo is optional. When one is attached it is sent alongside the name so
+  // the model can refine portions and spot components the text did not mention.
+  let image: { mimeType: string; base64: string } | null = null;
+  if (typeof body.imageDataUrl === "string" && body.imageDataUrl !== "") {
+    image = readImageDataUrl(body.imageDataUrl);
+    if (!image) {
+      return res.status(400).json({ error: "That photo could not be read. Try a JPEG, PNG, or WebP under 1.5 MB." });
+    }
+  }
+
+  if (isAnalyzeThrottled(user.id)) {
+    return res.status(429).json({ error: "Too many requests. Give it a minute and try again." });
+  }
+
+  const parts: GeminiPart[] = [{ text: buildGeneratePrompt(mealName, image !== null) }];
+  if (image) {
+    parts.push({ inline_data: { mime_type: image.mimeType, data: image.base64 } });
+  }
+
+  const outcome = await callGemini(GENERATE_SYSTEM_PROMPT, parts);
+  if (isGeminiFailure(outcome)) {
+    return mapGeminiError(res, outcome.status);
+  }
+  return sendAnalysis(res, outcome.text);
+}
+
+async function handleSearch(res: VercelResponse, rawQuery: string, userId: string) {
   const query = rawQuery.replace(/\s+/g, " ").trim();
   if (query.length < 2) {
     return res.status(400).json({ error: "Type at least two letters to search." });
@@ -333,6 +371,11 @@ async function handleSearch(req: VercelRequest, res: VercelResponse, rawQuery: s
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method === "POST") {
+    const body = readBody(req);
+    // A meal name routes to text generation; a photo alone routes to photo analysis.
+    if (typeof body.mealName === "string" && body.mealName.trim()) {
+      return handleGenerate(req, res);
+    }
     return handleAnalyze(req, res);
   }
 
@@ -345,69 +388,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (!user) return;
 
   const rawSearch = typeof req.query.search === "string" ? req.query.search : "";
-  const rawCode = typeof req.query.code === "string" ? req.query.code : "";
-
-  if (rawSearch.trim() && rawCode.trim()) {
-    return res.status(400).json({ error: "Search for a food or scan a barcode, not both." });
+  if (!rawSearch.trim()) {
+    return res.status(400).json({ error: "Type at least two letters to search." });
   }
-  if (rawSearch.trim()) {
-    return handleSearch(req, res, rawSearch, user.id);
-  }
-
-  const code = parseBarcode(rawCode);
-  if (!code) {
-    return res.status(400).json({ error: "That does not look like a valid barcode." });
-  }
-
-  if (isThrottled(user.id)) {
-    return res.status(429).json({ error: "Too many lookups. Try again in a minute." });
-  }
-
-  const cached = readCache(code);
-  if (cached) {
-    return res.status(cached.status).json(cached.payload);
-  }
-
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), UPSTREAM_TIMEOUT_MS);
-
-  let envelope: unknown;
-  try {
-    const response = await fetch(`${OFF_PRODUCT_URL}/${code}.json?fields=${encodeURIComponent(FIELDS)}`, {
-      headers: { "User-Agent": OFF_USER_AGENT, Accept: "application/json" },
-      signal: controller.signal,
-    });
-
-    if (!response.ok) {
-      console.error(`Open Food Facts responded ${response.status} for ${code}`);
-      return res.status(502).json({ error: "The food database is not responding. Try again shortly." });
-    }
-
-    envelope = await response.json();
-  } catch (error) {
-    console.error("Barcode lookup failed:", error);
-    return res.status(502).json({ error: "Could not reach the food database. Try again shortly." });
-  } finally {
-    clearTimeout(timer);
-  }
-
-  const result = normalizeOffProduct(envelope, code);
-
-  if (!result.found) {
-    // Cache misses as well as hits: a product that does not exist today is not
-    // going to exist on the next request either.
-    const notFound = { error: "No product found for that barcode." };
-    writeCache(code, 404, notFound);
-    return res.status(404).json(notFound);
-  }
-
-  const body = {
-    source: "openfoodfacts",
-    product: result.product,
-    totals: toWholeNumbers(result.product.display),
-  };
-
-  writeCache(code, 200, body);
-
-  return res.status(200).json(body);
+  return handleSearch(res, rawSearch, user.id);
 }

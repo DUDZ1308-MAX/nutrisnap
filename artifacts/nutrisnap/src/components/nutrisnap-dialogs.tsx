@@ -1,10 +1,10 @@
-import { Camera, Check, ImagePlus, X, Bookmark, BookmarkCheck, Sparkles, ScanLine, Search, Loader2, TriangleAlert } from 'lucide-react';
+import { Camera, Check, ImagePlus, X, Bookmark, BookmarkCheck, Sparkles, Search, Loader2, TriangleAlert } from 'lucide-react';
 import { useEffect, useRef, useState, type ChangeEvent, type FormEvent, type ReactNode } from 'react';
 import type { Meal, MealType, SavedMeal, Workout } from '@/lib/nutrisnap-storage';
 import { todayKey, workoutTargetAreas, type WorkoutTarget } from '@/lib/nutrisnap-storage';
 import { MuscleMap } from '@/components/muscle-map';
 import { useAuth } from '@/lib/auth-context';
-import { lookupBarcode, searchFoods, analyzeMealPhoto, getMe, type FoodSearchResult, type MealAnalysis } from '@/lib/api';
+import { searchFoods, analyzeMealPhoto, generateNutrition, getMe, type FoodSearchResult, type MealAnalysis } from '@/lib/api';
 
 type ModalProps = { title: string; eyebrow: string; onClose: () => void; children: ReactNode };
 
@@ -93,91 +93,6 @@ function Field({ label, children, wide = false }: { label: string; children: Rea
 
 const inputClass = 'focus-ring h-11 w-full rounded-xl border border-input bg-background px-3.5 text-sm text-foreground outline-none transition placeholder:text-muted-foreground/60 focus:border-primary focus:ring-2 focus:ring-primary/10';
 
-type BarcodeScannerProps = { onClose: () => void; onDetected: (code: string) => void };
-
-function BarcodeScanner({ onClose, onDetected }: BarcodeScannerProps) {
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const [cameraError, setCameraError] = useState('');
-  const [manual, setManual] = useState('');
-  const settled = useRef(false);
-
-  useEffect(() => {
-    let cancelled = false;
-    let controls: { stop: () => void } | undefined;
-
-    // Imported lazily so the decoder bundle is only fetched when the scanner opens.
-    import('@zxing/library').then(({ BrowserMultiFormatReader }) => {
-      if (cancelled || settled.current) return;
-      const video = videoRef.current;
-      if (!video) return;
-
-      const reader = new BrowserMultiFormatReader();
-      reader
-        .decodeFromVideoDevice(null, video, (result) => {
-          if (!result || settled.current) return;
-          settled.current = true;
-          controls?.stop();
-          onDetected(result.getText());
-        })
-        .then((c) => {
-          controls = c as unknown as { stop: () => void };
-        })
-        .catch(() => {
-          if (!cancelled) setCameraError('Camera unavailable. Enter the barcode numbers below instead.');
-        });
-    });
-
-    return () => {
-      cancelled = true;
-      try {
-        controls?.stop();
-      } catch {
-        // The stream may already be closed by the browser.
-      }
-    };
-  }, [onDetected]);
-
-  return (
-    <Modal title="Scan a barcode" eyebrow="Open Food Facts" onClose={onClose}>
-      <div className="space-y-4">
-        <div className="relative aspect-[4/3] overflow-hidden rounded-2xl border border-border bg-secondary/45">
-          <video ref={videoRef} className="h-full w-full object-cover" muted playsInline />
-          <div className="pointer-events-none absolute inset-0 grid place-items-center">
-            <div className="h-28 w-[78%] rounded-xl border-2 border-primary/70 shadow-[0_0_0_9999px_rgba(0,0,0,0.25)]" />
-          </div>
-        </div>
-        {cameraError ? <p className="text-xs font-semibold text-destructive" role="status">{cameraError}</p> : null}
-        <Field label="Or type the numbers">
-          <div className="flex gap-2">
-            <input
-              inputMode="numeric"
-              autoComplete="off"
-              value={manual}
-              onChange={(e) => setManual(e.target.value.replace(/\D/g, '').slice(0, 14))}
-              placeholder="e.g. 5449000000996"
-              className={inputClass}
-              data-testid="input-barcode-manual"
-            />
-            <button
-              type="button"
-              disabled={manual.length < 8}
-              onClick={() => { if (manual.length >= 8) onDetected(manual); }}
-              className="focus-ring h-11 shrink-0 rounded-xl bg-primary px-4 text-sm font-bold text-primary-foreground transition hover:brightness-105 disabled:opacity-40"
-              data-testid="button-barcode-manual-submit"
-            >
-              Look up
-            </button>
-          </div>
-        </Field>
-        <p className="text-[11px] leading-relaxed text-muted-foreground">
-          Nutrition data from{' '}
-          <a href="https://world.openfoodfacts.org" target="_blank" rel="noreferrer" className="font-semibold text-primary underline">Open Food Facts</a>, licensed under ODbL.
-        </p>
-      </div>
-    </Modal>
-  );
-}
-
 const activityTargetMap: Record<string, string[]> = {
   Strength: ['chest', 'back', 'shoulders', 'biceps', 'triceps', 'quads', 'hamstrings', 'glutes'],
   Run: ['quads', 'hamstrings', 'calves', 'glutes'],
@@ -237,11 +152,9 @@ export function MealDialog({ meal, onClose, onSave, savedMeals = [], onSaveFavor
     imageDataUrl: meal?.imageDataUrl,
   });
   const [error, setError] = useState('');
-  const [looking, setLooking] = useState(false);
-  const [lookupError, setLookupError] = useState('');
-  const [lookupSource, setLookupSource] = useState<{ label: string; basis: string | null; kind?: 'barcode' | 'search' | 'photo' } | null>(null);
-  const [scanning, setScanning] = useState(false);
+  const [lookupSource, setLookupSource] = useState<{ label: string; basis: string | null; kind?: 'search' | 'photo' | 'generate' } | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
+  const [generating, setGenerating] = useState(false);
   const [analysisError, setAnalysisError] = useState('');
   const [analysis, setAnalysis] = useState<MealAnalysis | null>(null);
   // null while the existing consent receipt is still being read from the server.
@@ -285,8 +198,6 @@ export function MealDialog({ meal, onClose, onSave, savedMeals = [], onSaveFavor
       imageDataUrl: meal?.imageDataUrl,
     });
     setLookupSource(null);
-    setLookupError('');
-    setScanning(false);
     setAnalysis(null);
     setAnalysisError('');
     setSelectedFood(null);
@@ -363,11 +274,14 @@ export function MealDialog({ meal, onClose, onSave, savedMeals = [], onSaveFavor
     };
     reader.readAsDataURL(file);
   };
-  const handleBarcodeLookup = async (code: string) => {
-    setScanning(false);
-    setLooking(true);
-    setLookupError('');
-    setLookupSource(null);
+  const handleGenerate = async () => {
+    if (!form.name.trim()) {
+      setError('Give this meal a name first.');
+      return;
+    }
+    setGenerating(true);
+    setError('');
+    setAnalysisError('');
     setSelectedFood(null);
     setGrams(100);
     setSearchQuery('');
@@ -375,26 +289,22 @@ export function MealDialog({ meal, onClose, onSave, savedMeals = [], onSaveFavor
     setSearchError('');
     setSearchPinned(false);
     try {
-      const data = await lookupBarcode(code);
-      const { product, totals } = data;
-      if (product.noNutritionData) {
-        setForm((current) => ({ ...current, name: current.name.trim() || product.name }));
-        setLookupSource({ label: `${product.name} — no nutrition data on file`, basis: null, kind: 'barcode' });
-        return;
-      }
+      const result = await generateNutrition(form.name.trim(), form.imageDataUrl);
+      setAnalysis(result);
+      // Prefill only. Everything stays editable and nothing is saved until submit.
       setForm((current) => ({
         ...current,
-        name: current.name.trim() || product.name,
-        calories: totals.calories,
-        protein: totals.protein,
-        carbs: totals.carbs,
-        fat: totals.fat,
+        name: current.name.trim() || result.dishName,
+        calories: result.totals.calories,
+        protein: Math.round(result.totals.protein),
+        carbs: Math.round(result.totals.carbs),
+        fat: Math.round(result.totals.fat),
       }));
-      setLookupSource({ label: product.name, basis: product.basis === 'serving' ? (product.servingLabel ?? '1 serving') : 'per 100 g', kind: 'barcode' });
+      setLookupSource({ label: result.dishName, basis: 'generated from description', kind: 'generate' });
     } catch (error) {
-      setLookupError(error instanceof Error ? error.message : 'Could not look up that barcode.');
+      setAnalysisError(error instanceof Error ? error.message : 'Could not generate nutrition facts.');
     } finally {
-      setLooking(false);
+      setGenerating(false);
     }
   };
 
@@ -405,6 +315,7 @@ export function MealDialog({ meal, onClose, onSave, savedMeals = [], onSaveFavor
     }
     setAnalyzing(true);
     setAnalysisError('');
+    setGenerating(false);
     setSelectedFood(null);
     setGrams(100);
     setSearchQuery('');
@@ -443,7 +354,7 @@ export function MealDialog({ meal, onClose, onSave, savedMeals = [], onSaveFavor
     setAnalysis(null);
     setAnalysisError('');
     const per100 = food.per100g;
-    // Prefill only, the same contract as the barcode and photo paths.
+    // Prefill only, the same contract as the search and photo paths.
     setForm((current) => ({
       ...current,
       name: current.name.trim() || food.description,
@@ -519,11 +430,11 @@ export function MealDialog({ meal, onClose, onSave, savedMeals = [], onSaveFavor
         <div className="rounded-2xl border border-border bg-background/70 p-3 sm:p-4">
           <div className="mb-2 flex items-center justify-between sm:mb-3">
             <div><p className="text-sm font-bold">Nutrition facts</p><p className="text-[11px] text-muted-foreground sm:text-xs">Auto-fill or enter manually.</p></div>
-            <span className="rounded-full bg-accent/35 px-2 py-0.5 font-mono-ui text-[10px] font-medium text-foreground" data-testid="nutrition-source-badge">{analysis ? 'Estimated' : lookupSource?.kind === 'search' ? 'Matched' : lookupSource ? 'Scanned' : 'Manual'}</span>
+            <span className="rounded-full bg-accent/35 px-2 py-0.5 font-mono-ui text-[10px] font-medium text-foreground" data-testid="nutrition-source-badge">{lookupSource?.kind === 'photo' ? 'Estimated' : lookupSource?.kind === 'generate' ? 'Generated' : lookupSource?.kind === 'search' ? 'Matched' : 'Manual'}</span>
           </div>
           <div className="mb-2 space-y-2 sm:mb-3">
-            <button type="button" onClick={() => setScanning(true)} disabled={looking} className="focus-ring w-full h-9 rounded-xl bg-primary px-4 text-xs font-bold text-primary-foreground transition hover:brightness-105 disabled:opacity-40 disabled:cursor-not-allowed sm:h-10 sm:text-sm" data-testid="button-scan-barcode">
-              <span className="inline-flex items-center gap-2"><ScanLine size={15} /> {looking ? 'Looking up...' : 'Scan barcode to fill'}</span>
+            <button type="button" onClick={handleGenerate} disabled={generating || !form.name.trim()} className="focus-ring w-full h-9 rounded-xl bg-primary px-4 text-xs font-bold text-primary-foreground transition hover:brightness-105 disabled:opacity-40 disabled:cursor-not-allowed sm:h-10 sm:text-sm" data-testid="button-generate-nutrition">
+              <span className="inline-flex items-center gap-2"><Sparkles size={15} /> {generating ? 'Generating...' : 'Generate nutrition facts'}</span>
             </button>
             <div className="relative">
               <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
@@ -565,9 +476,8 @@ export function MealDialog({ meal, onClose, onSave, savedMeals = [], onSaveFavor
               </ul>
             ) : null}
           </div>
-          {lookupError ? <p className="mb-2 text-xs text-destructive" role="status" data-testid="status-barcode-error">{lookupError}</p> : null}
           {lookupSource ? (
-            <p className="mb-2 text-[11px] text-muted-foreground sm:text-xs" role="status" data-testid="status-barcode-source">
+            <p className="mb-2 text-[11px] text-muted-foreground sm:text-xs" role="status" data-testid="status-nutrition-source">
               Filled from <span className="font-semibold text-foreground">{lookupSource.label}</span>
               {lookupSource.basis ? <span> · {lookupSource.basis}</span> : null} · check before saving
             </p>
@@ -687,7 +597,6 @@ export function MealDialog({ meal, onClose, onSave, savedMeals = [], onSaveFavor
         </div>
       </form>
     </Modal>
-    {scanning ? <BarcodeScanner onClose={() => setScanning(false)} onDetected={handleBarcodeLookup} /> : null}
     </>
   );
 }
